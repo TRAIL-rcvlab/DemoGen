@@ -1,0 +1,65 @@
+# ============================================================
+# DemoGen Docker Compose - Training & Inference on GPU servers
+# ============================================================
+#
+# Usage:
+#   docker compose build              # Build the image
+#   docker compose run train           # Run training
+#   docker compose run inference       # Run inference / evaluation
+#   docker compose run demogen         # Run demo generation
+#   docker compose run dev bash        # Interactive development shell
+
+services:
+  # --- Base service (shared config) ---
+  base: &base
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: demogen:latest
+    volumes:
+      - ./data:/workspace/DemoGen/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HYDRA_FULL_ERROR=1
+
+  # --- Training ---
+  train:
+    <<: *base
+    working_dir: /workspace/DemoGen/diffusion_policies
+    command: >
+      bash train.sh
+      ${DEMO:-flower-demogen-test-grid-16}
+      ${ALGO:-dp3}
+      ${TASK:-flower_demogen}
+      ${SEED:-0}
+
+  # --- Inference / Evaluation ---
+  inference:
+    <<: *base
+    working_dir: /workspace/DemoGen/experiments/segment_weighting
+    command: >
+      bash eval_experiments.sh
+      ${EVAL_DIR:-/workspace/DemoGen/data/ckpts}
+      ${ENV_RUNNER:-robosuite}
+      ${EVAL_EPISODES:-20}
+
+  # --- Demo Generation ---
+  demogen:
+    <<: *base
+    working_dir: /workspace/DemoGen/demo_generation
+    command: >
+      bash run_gen_demo.sh
+
+  # --- Interactive Development ---
+  dev:
+    <<: *base
+    stdin_open: true
+    tty: true
+    command: bash
