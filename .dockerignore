@@ -1,0 +1,14 @@
+.git
+__pycache__
+*.pyc
+*.egg-info
+build/
+dist/
+.eggs/
+*.egg
+data/ckpts/*
+data/datasets/generated/*
+data/videos/*
+demo_generation/outputs/*
+.venv
+.env
