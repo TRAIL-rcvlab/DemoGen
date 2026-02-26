@@ -52,6 +52,40 @@ python train.py --config-path=../experiments/segment_weighting/config \
     exp_name=motion_2x
 ```
 
+### 4. 评估训练好的策略（推理 / Inference）
+
+训练完成后，使用 `eval_experiments.sh` 在仿真环境中评估策略的平均成功率：
+
+```bash
+cd experiments/segment_weighting
+# 评估所有实验（默认使用 robosuite 环境，20 episodes）
+bash eval_experiments.sh <train_output_base_dir>
+
+# 评估所有实验（使用 metaworld 环境，50 episodes）
+bash eval_experiments.sh <train_output_base_dir> metaworld 50
+
+# 仅评估单个实验
+bash eval_experiments.sh <train_output_base_dir> robosuite 20 balanced
+```
+
+其中 `<train_output_base_dir>` 是训练输出的基础目录（包含各实验的子目录及 checkpoint），
+例如 `data/outputs/2024.01.01`。
+
+也可以直接调用 `diffusion_policies/eval.py` 评估单个 checkpoint：
+
+```bash
+cd diffusion_policies
+python eval.py \
+    --config-path=../experiments/segment_weighting/config \
+    --config-name=segment_weight_exp \
+    hydra.run.dir=<checkpoint_dir> \
+    task.env_runner._target_=diffusion_policies.env_runner.robosuite_runner.RobosuiteRunner \
+    task.env_runner.eval_episodes=20 \
+    task.env_runner.n_obs_steps='${n_obs_steps}' \
+    task.env_runner.n_action_steps='${n_action_steps}' \
+    task.env_runner.shape_meta='${shape_meta}'
+```
+
 ## 文件结构
 
 ```
@@ -63,7 +97,8 @@ experiments/segment_weighting/
 │   ├── task/
 │   │   └── segment_weight_exp.yaml    # 任务配置（片段边界）
 │   └── segment_weight_exp.yaml        # 主训练配置
-└── run_experiments.sh                 # 批量运行所有权重配置的脚本
+├── run_experiments.sh                 # 批量运行所有权重配置的脚本（训练）
+└── eval_experiments.sh                # 批量评估训练好策略的脚本（推理）
 ```
 
 ## 片段边界参考
