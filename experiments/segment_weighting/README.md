@@ -32,8 +32,8 @@
 
 ### 1. 生成数据（标准 DemoGen 流程）
 ```bash
-cd demo_generation
-python gen_demo.py --config-name=flower
+# cd demo_generation
+python demo_generation/gen_demo.py --config-name=flower generation.render_video=False
 ```
 
 ### 2. 运行所有实验

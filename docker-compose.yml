@@ -12,6 +12,7 @@
 x-common: &common
   image: luobaigu/demogen:latest
   working_dir: /workspace/DemoGen
+  ipc: host
   volumes:
     - ./:/workspace/DemoGen
   deploy:

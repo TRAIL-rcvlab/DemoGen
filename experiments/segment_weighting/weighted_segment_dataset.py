@@ -52,8 +52,15 @@ class WeightedSegmentDataset(BasePointcloudDataset):
         """
         super().__init__()
         self.task_name = task_name
+        dataset_path = zarr_path
+        if not os.path.isabs(dataset_path) and not os.path.exists(dataset_path):
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            resolved_dataset_path = os.path.join(repo_root, dataset_path)
+            if os.path.exists(resolved_dataset_path):
+                dataset_path = resolved_dataset_path
+
         self.replay_buffer = ReplayBuffer.copy_from_path(
-            zarr_path, keys=['agent_pos', 'action', 'point_cloud'])
+            dataset_path, keys=['agent_pos', 'action', 'point_cloud'])
         val_mask = get_val_mask(
             n_episodes=self.replay_buffer.n_episodes,
             val_ratio=val_ratio,
