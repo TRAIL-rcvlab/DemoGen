@@ -1,0 +1,45 @@
+# Task config for segment weighting experiment
+# Modify zarr_path and parsing_frames for your specific task
+
+name: segment_weight_exp
+
+task_name: ${name}
+
+shape_meta: &shape_meta
+  obs:
+    point_cloud:
+      shape: [1024, 3]
+      type: point_cloud
+    agent_pos:
+      shape: [12]
+      type: low_dim
+  action:
+    shape: [12]
+
+env_runner: null
+
+# Segment boundaries matching DemoGen parsing_frames convention
+# Adjust these to match your task's trajectory decomposition
+parsing_frames:
+  motion-1: 0
+  skill-1: 6
+  motion-2: 68
+  skill-2: 83
+
+# Sampling weights for motion vs skill segments
+# Both must be >= 1.0 (at least 1x original data)
+segment_weights:
+  motion: 1.0
+  skill: 1.0
+
+dataset:
+  _target_: experiments.segment_weighting.weighted_segment_dataset.WeightedSegmentDataset
+  zarr_path: data/datasets/generated/flower_test_16.zarr
+  parsing_frames: ${parsing_frames}
+  segment_weights: ${segment_weights}
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  val_ratio: 0.02
+  max_train_episodes: null
