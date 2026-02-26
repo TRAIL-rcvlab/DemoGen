@@ -2,6 +2,11 @@
 # Consolidated from docs/0_install.md
 
 # Core ML
+# NOTE: torch 2.0.1 has known CVEs (heap buffer overflow, use-after-free fixed
+# in 2.2.0; torch.load RCE fixed in 2.6.0). It is pinned here because the
+# upstream project (diffusers==0.11.1, training configs, CUDA 11.8 wheel index)
+# was validated against this version. Upgrading torch requires a coordinated
+# update of the full ML stack and re-validation of training/inference pipelines.
 torch==2.0.1
 torchvision
 torchaudio
