@@ -16,12 +16,11 @@ from segment_weighted_sampler import SegmentWeightedSampler
 
 class WeightedSegmentDataset(BasePointcloudDataset):
     """
-    A dataset that applies segment-aware weighted sampling for training.
+    支持按片段加权采样的数据集类。
 
-    Extends the standard PandaDataset by using SegmentWeightedSampler,
-    which oversamples motion or skill segments based on configurable weights.
-    This enables experiments to test whether different data segments
-    contribute differently to the learned policy.
+    基于 PandaDataset 扩展，使用 SegmentWeightedSampler 对 motion（运动）或
+    skill（技能/规划）片段进行过采样。通过改变不同片段的采样权重，可以验证
+    数据的不同片段对模型性能的贡献是否不同。
     """
 
     def __init__(self,
@@ -37,19 +36,19 @@ class WeightedSegmentDataset(BasePointcloudDataset):
                  task_name=None,
                  ):
         """
-        Args:
-            zarr_path: Path to zarr dataset
-            parsing_frames: Dict with segment boundaries, e.g.:
+        参数:
+            zarr_path: zarr 数据集路径
+            parsing_frames: 片段边界字典，例如：
                 {"motion-1": 0, "skill-1": 6, "motion-2": 68, "skill-2": 83}
-            segment_weights: Dict with sampling weights, e.g.:
+            segment_weights: 采样权重字典，例如：
                 {"motion": 2.0, "skill": 1.0}
-            horizon: Sequence length for sampling
-            pad_before: Padding before sequence
-            pad_after: Padding after sequence
-            seed: Random seed
-            val_ratio: Validation set ratio
-            max_train_episodes: Maximum number of training episodes
-            task_name: Name of the task
+            horizon: 采样序列长度
+            pad_before: 序列前填充步数
+            pad_after: 序列后填充步数
+            seed: 随机种子
+            val_ratio: 验证集比例
+            max_train_episodes: 最大训练 episode 数量
+            task_name: 任务名称
         """
         super().__init__()
         self.task_name = task_name
@@ -85,7 +84,7 @@ class WeightedSegmentDataset(BasePointcloudDataset):
 
     def get_validation_dataset(self):
         val_set = copy.copy(self)
-        # Validation uses uniform sampling (no weighting)
+        # 验证集使用均匀采样（不加权）
         val_set.sampler = SegmentWeightedSampler(
             replay_buffer=self.replay_buffer,
             sequence_length=self.horizon,

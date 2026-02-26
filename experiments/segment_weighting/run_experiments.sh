@@ -1,19 +1,19 @@
 #!/bin/bash
-# Run segment weighting experiments with different weight configurations.
+# 运行片段加权实验，使用不同的权重配置。
 #
-# This script trains policies with different sampling weights for motion
-# vs skill segments to test their relative contribution to model performance.
+# 本脚本使用不同的 motion（运动）和 skill（技能/规划）片段采样权重训练策略，
+# 以测试不同数据片段对模型性能的贡献差异。
 #
-# Prerequisites:
-#   1. Generate synthetic data using DemoGen:
+# 前置条件:
+#   1. 使用 DemoGen 生成合成数据：
 #      cd demo_generation && python gen_demo.py --config-name=flower
-#   2. Update zarr_path in config/task/segment_weight_exp.yaml
+#   2. 更新 config/task/segment_weight_exp.yaml 中的 zarr_path
 #
-# Usage:
+# 使用方法:
 #   bash run_experiments.sh
 #
-# The script runs 5 configurations:
-#   - balanced:   motion=1.0, skill=1.0 (baseline)
+# 本脚本运行 5 种配置：
+#   - balanced:   motion=1.0, skill=1.0（基准）
 #   - motion_2x:  motion=2.0, skill=1.0
 #   - motion_3x:  motion=3.0, skill=1.0
 #   - skill_2x:   motion=1.0, skill=2.0
@@ -21,7 +21,7 @@
 
 set -e
 
-# Navigate to the diffusion_policies directory (training entry point)
+# 进入 diffusion_policies 目录（训练入口）
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}/diffusion_policies"
@@ -29,11 +29,11 @@ cd "${REPO_ROOT}/diffusion_policies"
 CONFIG_PATH="../experiments/segment_weighting/config"
 
 echo "============================================"
-echo "  Segment Weighting Experiment"
+echo "  片段加权实验"
 echo "============================================"
 echo ""
 
-# Define experiment configurations: name, motion_weight, skill_weight
+# 定义实验配置：名称, motion权重, skill权重
 declare -a EXPERIMENTS=(
     "balanced 1.0 1.0"
     "motion_2x 2.0 1.0"
@@ -46,8 +46,8 @@ for exp in "${EXPERIMENTS[@]}"; do
     read -r exp_name motion_w skill_w <<< "$exp"
 
     echo "--------------------------------------------"
-    echo "  Running: ${exp_name}"
-    echo "  Motion weight: ${motion_w}, Skill weight: ${skill_w}"
+    echo "  运行: ${exp_name}"
+    echo "  Motion 权重: ${motion_w}, Skill 权重: ${skill_w}"
     echo "--------------------------------------------"
 
     python train.py \
@@ -59,10 +59,10 @@ for exp in "${EXPERIMENTS[@]}"; do
         logging.name="${exp_name}" \
         logging.tags="[${exp_name},segment_weighting]"
 
-    echo "  Finished: ${exp_name}"
+    echo "  完成: ${exp_name}"
     echo ""
 done
 
 echo "============================================"
-echo "  All experiments completed!"
+echo "  所有实验已完成！"
 echo "============================================"

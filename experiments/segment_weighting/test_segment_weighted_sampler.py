@@ -1,11 +1,11 @@
 """
-Tests for the SegmentWeightedSampler.
+SegmentWeightedSampler 的测试。
 
-These tests validate that:
-1. Segment classification works correctly for both one-stage and two-stage tasks
-2. Weighted indices are properly duplicated based on segment weights
-3. Balanced weights produce the same number of indices as the original sampler
-4. Oversampling increases the total number of indices proportionally
+验证以下内容：
+1. 单阶段和双阶段任务的片段分类是否正确
+2. 加权索引是否按片段权重正确重复
+3. 平衡权重（1.0, 1.0）是否保持与原始采样器相同的索引数量
+4. 过采样是否按比例增加了总索引数量
 """
 
 import numpy as np
@@ -19,7 +19,7 @@ from segment_weighted_sampler import SegmentWeightedSampler
 
 
 def _make_mock_replay_buffer(n_episodes=4, episode_length=100):
-    """Create a minimal mock replay buffer for testing."""
+    """创建用于测试的最小化模拟 replay buffer。"""
 
     class MockReplayBuffer:
         def __init__(self, n_episodes, episode_length):
@@ -45,7 +45,7 @@ def _make_mock_replay_buffer(n_episodes=4, episode_length=100):
 
 
 def test_segment_classification_two_stage():
-    """Test that frames are classified into correct segments for two-stage tasks."""
+    """测试双阶段任务的帧片段分类是否正确。"""
     sampler = SegmentWeightedSampler.__new__(SegmentWeightedSampler)
     sampler.parsing_frames = {
         "motion-1": 0,
@@ -54,31 +54,31 @@ def test_segment_classification_two_stage():
         "skill-2": 83,
     }
 
-    # motion-1: frames [0, 6)
+    # motion-1: 帧 [0, 6)
     assert sampler._classify_segment(0, 100) == "motion"
     assert sampler._classify_segment(3, 100) == "motion"
     assert sampler._classify_segment(5, 100) == "motion"
 
-    # skill-1: frames [6, 68)
+    # skill-1: 帧 [6, 68)
     assert sampler._classify_segment(6, 100) == "skill"
     assert sampler._classify_segment(30, 100) == "skill"
     assert sampler._classify_segment(67, 100) == "skill"
 
-    # motion-2: frames [68, 83)
+    # motion-2: 帧 [68, 83)
     assert sampler._classify_segment(68, 100) == "motion"
     assert sampler._classify_segment(75, 100) == "motion"
     assert sampler._classify_segment(82, 100) == "motion"
 
-    # skill-2: frames [83, end)
+    # skill-2: 帧 [83, end)
     assert sampler._classify_segment(83, 100) == "skill"
     assert sampler._classify_segment(90, 100) == "skill"
     assert sampler._classify_segment(99, 100) == "skill"
 
-    print("PASSED: test_segment_classification_two_stage")
+    print("通过: test_segment_classification_two_stage")
 
 
 def test_segment_classification_one_stage():
-    """Test that frames are classified for one-stage tasks (no motion-2/skill-2)."""
+    """测试单阶段任务（无 motion-2/skill-2）的帧片段分类。"""
     sampler = SegmentWeightedSampler.__new__(SegmentWeightedSampler)
     sampler.parsing_frames = {
         "motion-1": 0,
@@ -87,19 +87,19 @@ def test_segment_classification_one_stage():
         "skill-2": None,
     }
 
-    # motion-1: frames [0, 7)
+    # motion-1: 帧 [0, 7)
     assert sampler._classify_segment(0, 50) == "motion"
     assert sampler._classify_segment(6, 50) == "motion"
 
-    # skill-1: frames [7, end)
+    # skill-1: 帧 [7, end)
     assert sampler._classify_segment(7, 50) == "skill"
     assert sampler._classify_segment(30, 50) == "skill"
 
-    print("PASSED: test_segment_classification_one_stage")
+    print("通过: test_segment_classification_one_stage")
 
 
 def test_balanced_weights_preserve_count():
-    """Test that balanced weights (1.0, 1.0) produce the same number of indices."""
+    """测试平衡权重（1.0, 1.0）是否保持索引数量不变。"""
     replay_buffer = _make_mock_replay_buffer(n_episodes=2, episode_length=50)
     parsing_frames = {"motion-1": 0, "skill-1": 5, "motion-2": 30, "skill-2": 40}
 
@@ -121,14 +121,14 @@ def test_balanced_weights_preserve_count():
     )
 
     assert len(base_sampler) == len(weighted_sampler), (
-        f"Balanced weights should preserve index count: "
-        f"base={len(base_sampler)}, weighted={len(weighted_sampler)}"
+        f"平衡权重应保持索引数量不变: "
+        f"基准={len(base_sampler)}, 加权={len(weighted_sampler)}"
     )
-    print("PASSED: test_balanced_weights_preserve_count")
+    print("通过: test_balanced_weights_preserve_count")
 
 
 def test_motion_oversampling_increases_count():
-    """Test that motion oversampling increases total indices."""
+    """测试 motion 过采样是否增加了总索引数量。"""
     replay_buffer = _make_mock_replay_buffer(n_episodes=2, episode_length=50)
     parsing_frames = {"motion-1": 0, "skill-1": 5, "motion-2": 30, "skill-2": 40}
 
@@ -151,14 +151,14 @@ def test_motion_oversampling_increases_count():
     )
 
     assert len(motion_2x) > len(balanced), (
-        f"Motion 2x should have more indices: "
-        f"balanced={len(balanced)}, motion_2x={len(motion_2x)}"
+        f"motion 2倍过采样应有更多索引: "
+        f"平衡={len(balanced)}, motion_2x={len(motion_2x)}"
     )
-    print("PASSED: test_motion_oversampling_increases_count")
+    print("通过: test_motion_oversampling_increases_count")
 
 
 def test_skill_oversampling_increases_count():
-    """Test that skill oversampling increases total indices."""
+    """测试 skill 过采样是否增加了总索引数量。"""
     replay_buffer = _make_mock_replay_buffer(n_episodes=2, episode_length=50)
     parsing_frames = {"motion-1": 0, "skill-1": 5, "motion-2": 30, "skill-2": 40}
 
@@ -181,14 +181,14 @@ def test_skill_oversampling_increases_count():
     )
 
     assert len(skill_2x) > len(balanced), (
-        f"Skill 2x should have more indices: "
-        f"balanced={len(balanced)}, skill_2x={len(skill_2x)}"
+        f"skill 2倍过采样应有更多索引: "
+        f"平衡={len(balanced)}, skill_2x={len(skill_2x)}"
     )
-    print("PASSED: test_skill_oversampling_increases_count")
+    print("通过: test_skill_oversampling_increases_count")
 
 
 def test_weight_assertion():
-    """Test that weights below 1.0 are rejected."""
+    """测试权重低于 1.0 时是否被正确拒绝。"""
     replay_buffer = _make_mock_replay_buffer(n_episodes=1, episode_length=50)
     parsing_frames = {"motion-1": 0, "skill-1": 5, "motion-2": 30, "skill-2": 40}
 
@@ -201,11 +201,11 @@ def test_weight_assertion():
             pad_before=1,
             pad_after=4,
         )
-        assert False, "Should have raised AssertionError for motion weight < 1.0"
+        assert False, "motion 权重 < 1.0 时应抛出 AssertionError"
     except AssertionError:
         pass
 
-    print("PASSED: test_weight_assertion")
+    print("通过: test_weight_assertion")
 
 
 if __name__ == "__main__":
@@ -215,4 +215,4 @@ if __name__ == "__main__":
     test_motion_oversampling_increases_count()
     test_skill_oversampling_increases_count()
     test_weight_assertion()
-    print("\nAll tests passed!")
+    print("\n所有测试通过！")

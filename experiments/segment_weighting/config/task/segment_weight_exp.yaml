@@ -1,5 +1,5 @@
-# Task config for segment weighting experiment
-# Modify zarr_path and parsing_frames for your specific task
+# 片段加权实验的任务配置
+# 请根据具体任务修改 zarr_path 和 parsing_frames
 
 name: segment_weight_exp
 
@@ -18,16 +18,16 @@ shape_meta: &shape_meta
 
 env_runner: null
 
-# Segment boundaries matching DemoGen parsing_frames convention
-# Adjust these to match your task's trajectory decomposition
+# 片段边界，与 DemoGen 的 parsing_frames 约定一致
+# 请根据任务的轨迹分解调整这些值
 parsing_frames:
   motion-1: 0
   skill-1: 6
   motion-2: 68
   skill-2: 83
 
-# Sampling weights for motion vs skill segments
-# Both must be >= 1.0 (at least 1x original data)
+# motion 与 skill 片段的采样权重
+# 两者都必须 >= 1.0（至少采样一倍原始数据）
 segment_weights:
   motion: 1.0
   skill: 1.0

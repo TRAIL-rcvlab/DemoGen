@@ -1,5 +1,5 @@
-# Main training config for segment weighting experiment
-# Based on dp3.yaml with task overridden for segment weighting
+# 片段加权实验的主训练配置
+# 基于 dp3.yaml，任务部分替换为片段加权配置
 
 defaults:
   - task: segment_weight_exp
@@ -19,7 +19,7 @@ dataset_obs_steps: ${n_obs_steps}
 keypoint_visible_rate: 1.0
 obs_as_global_cond: True
 
-# Pass through segment config for reference
+# 传递片段配置供参考
 parsing_frames: ${task.parsing_frames}
 segment_weights: ${task.segment_weights}
 
