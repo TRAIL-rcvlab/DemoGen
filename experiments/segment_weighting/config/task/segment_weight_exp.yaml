@@ -1,0 +1,45 @@
+# 片段加权实验的任务配置
+# 请根据具体任务修改 zarr_path 和 parsing_frames
+
+name: segment_weight_exp
+
+task_name: ${name}
+
+shape_meta: &shape_meta
+  obs:
+    point_cloud:
+      shape: [1024, 3]
+      type: point_cloud
+    agent_pos:
+      shape: [12]
+      type: low_dim
+  action:
+    shape: [12]
+
+env_runner: null
+
+# 片段边界，与 DemoGen 的 parsing_frames 约定一致
+# 请根据任务的轨迹分解调整这些值
+parsing_frames:
+  motion-1: 0
+  skill-1: 6
+  motion-2: 68
+  skill-2: 83
+
+# motion 与 skill 片段的采样权重
+# 两者都必须 >= 1.0（至少采样一倍原始数据）
+segment_weights:
+  motion: 1.0
+  skill: 1.0
+
+dataset:
+  _target_: experiments.segment_weighting.weighted_segment_dataset.WeightedSegmentDataset
+  zarr_path: data/datasets/generated/flower_test_16.zarr
+  parsing_frames: ${parsing_frames}
+  segment_weights: ${segment_weights}
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  val_ratio: 0.02
+  max_train_episodes: null
