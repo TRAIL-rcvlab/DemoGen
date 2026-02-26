@@ -9,28 +9,33 @@
 #   2. 训练输出目录中存在 checkpoints/latest.ckpt
 #
 # 使用方法:
+#   # 方式一：批量评估（自动搜索 checkpoint）
 #   bash eval_experiments.sh <train_output_base_dir> [env_runner] [eval_episodes]
+#
+#   # 方式二：评估单个实验（指定 checkpoint 目录）
+#   bash eval_experiments.sh <checkpoint_dir> [env_runner] [eval_episodes] <exp_name>
 #
 # 参数:
 #   train_output_base_dir  训练输出的基础目录，其中包含各实验的子目录
 #                          例如: data/outputs/2024.01.01
 #   env_runner             (可选) 环境类型: "robosuite" 或 "metaworld"，默认 "robosuite"
 #   eval_episodes          (可选) 每个实验评估的 episode 数量，默认 20
+#   exp_name               (可选) 单个实验名称，例如 "balanced"
 #
 # 示例:
-#   # 评估所有实验（使用 robosuite 环境，20 episodes）
+#   # 评估目录下所有含 checkpoint 的子目录（使用 robosuite 环境，20 episodes）
 #   bash eval_experiments.sh data/outputs/2024.01.01
 #
-#   # 评估所有实验（使用 metaworld 环境，50 episodes）
+#   # 评估目录下所有含 checkpoint 的子目录（使用 metaworld 环境，50 episodes）
 #   bash eval_experiments.sh data/outputs/2024.01.01 metaworld 50
 #
-#   # 评估单个实验
-#   bash eval_experiments.sh data/outputs/2024.01.01 robosuite 20 balanced
+#   # 评估单个实验（直接指定 checkpoint 目录）
+#   bash eval_experiments.sh data/outputs/2024.01.01/12.00.00_train_xxx robosuite 20 balanced
 
 set -e
 
 # ---- 参数解析 ----
-TRAIN_OUTPUT_BASE="${1:?请提供训练输出的基础目录，例如: data/outputs/2024.01.01}"
+TRAIN_OUTPUT_BASE="${1:?请提供训练输出目录，例如: data/outputs/2024.01.01}"
 ENV_RUNNER="${2:-robosuite}"
 EVAL_EPISODES="${3:-20}"
 SINGLE_EXP="${4:-}"
@@ -64,69 +69,18 @@ echo "  环境类型:     ${ENV_RUNNER}"
 echo "  评估 Episodes: ${EVAL_EPISODES}"
 echo ""
 
-# ---- 定义实验名称（与 run_experiments.sh 一致）----
-declare -a EXPERIMENT_NAMES=(
-    "balanced"
-    "motion_2x"
-    "motion_3x"
-    "skill_2x"
-    "skill_3x"
-)
+# ---- 评估单个 checkpoint 目录的函数 ----
+eval_checkpoint() {
+    local ckpt_dir="$1"
+    local exp_name="$2"
 
-# 如果指定了单个实验，则只评估该实验
-if [ -n "${SINGLE_EXP}" ]; then
-    EXPERIMENT_NAMES=("${SINGLE_EXP}")
-fi
-
-# ---- 收集评估结果 ----
-declare -A RESULTS
-
-for exp_name in "${EXPERIMENT_NAMES[@]}"; do
-    echo "--------------------------------------------"
-    echo "  评估: ${exp_name}"
-    echo "--------------------------------------------"
-
-    # 查找该实验的训练输出目录
-    # 训练时 hydra.run.dir 格式: data/outputs/{date}/{time}_{name}_{task_name}
-    # 在基础目录中搜索匹配的子目录
-    EXP_DIR=""
-    if [ -d "${TRAIN_OUTPUT_BASE}" ]; then
-        # 搜索包含实验名称的目录（匹配 *_train_diffusion_unet_hybrid_*exp_name* 模式）
-        for dir in "${TRAIN_OUTPUT_BASE}"/*/; do
-            if [ -d "${dir}" ]; then
-                dir_name="$(basename "${dir}")"
-                # 训练目录名包含 exp_name 作为 hydra override
-                if [ -f "${dir}/checkpoints/latest.ckpt" ]; then
-                    # 检查目录名或配置中是否匹配实验名称
-                    if echo "${dir_name}" | grep -q "${exp_name}\|train_diffusion_unet_hybrid"; then
-                        EXP_DIR="${dir}"
-                        break
-                    fi
-                fi
-            fi
-        done
-
-        # 如果没找到精确匹配，尝试通过 exp_name 子目录查找
-        if [ -z "${EXP_DIR}" ] && [ -d "${TRAIN_OUTPUT_BASE}/${exp_name}" ]; then
-            EXP_DIR="${TRAIN_OUTPUT_BASE}/${exp_name}"
-        fi
-    fi
-
-    if [ -z "${EXP_DIR}" ] || [ ! -f "${EXP_DIR}/checkpoints/latest.ckpt" ]; then
-        echo "  警告: 未找到实验 '${exp_name}' 的 checkpoint，跳过"
-        echo "  搜索路径: ${TRAIN_OUTPUT_BASE}"
-        echo ""
-        RESULTS["${exp_name}"]="跳过（未找到 checkpoint）"
-        continue
-    fi
-
-    echo "  Checkpoint 目录: ${EXP_DIR}"
+    echo "  Checkpoint 目录: ${ckpt_dir}"
 
     export HYDRA_FULL_ERROR=1
     python eval.py \
         --config-path="${CONFIG_PATH}" \
         --config-name=segment_weight_exp \
-        hydra.run.dir="${EXP_DIR}" \
+        hydra.run.dir="${ckpt_dir}" \
         task.env_runner._target_="${ENV_RUNNER_TARGET}" \
         task.env_runner.eval_episodes="${EVAL_EPISODES}" \
         task.env_runner.n_obs_steps='${n_obs_steps}' \
@@ -137,7 +91,56 @@ for exp_name in "${EXPERIMENT_NAMES[@]}"; do
     || echo "  失败: ${exp_name}"
 
     echo ""
+}
+
+# ---- 单个实验模式：直接使用给定目录 ----
+if [ -n "${SINGLE_EXP}" ]; then
+    echo "--------------------------------------------"
+    echo "  评估: ${SINGLE_EXP}"
+    echo "--------------------------------------------"
+
+    # 如果给定目录本身包含 checkpoint，直接使用
+    if [ -f "${TRAIN_OUTPUT_BASE}/checkpoints/latest.ckpt" ]; then
+        eval_checkpoint "${TRAIN_OUTPUT_BASE}" "${SINGLE_EXP}"
+    else
+        echo "  错误: 未在 '${TRAIN_OUTPUT_BASE}/checkpoints/latest.ckpt' 找到 checkpoint"
+        exit 1
+    fi
+
+    echo "============================================"
+    echo "  评估已完成！"
+    echo "============================================"
+    exit 0
+fi
+
+# ---- 批量模式：遍历基础目录下所有包含 checkpoint 的子目录 ----
+if [ ! -d "${TRAIN_OUTPUT_BASE}" ]; then
+    echo "错误: 目录 '${TRAIN_OUTPUT_BASE}' 不存在"
+    exit 1
+fi
+
+FOUND_ANY=false
+
+for dir in "${TRAIN_OUTPUT_BASE}"/*/; do
+    [ -d "${dir}" ] || continue
+    [ -f "${dir}/checkpoints/latest.ckpt" ] || continue
+
+    FOUND_ANY=true
+    dir_name="$(basename "${dir}")"
+
+    echo "--------------------------------------------"
+    echo "  评估: ${dir_name}"
+    echo "--------------------------------------------"
+
+    eval_checkpoint "${dir}" "${dir_name}"
 done
+
+if [ "${FOUND_ANY}" = false ]; then
+    echo "  警告: 在 '${TRAIN_OUTPUT_BASE}' 下未找到任何包含 checkpoints/latest.ckpt 的子目录"
+    echo "  请确认训练已完成，或直接指定 checkpoint 目录："
+    echo "    bash eval_experiments.sh <checkpoint_dir> ${ENV_RUNNER} ${EVAL_EPISODES} <exp_name>"
+    exit 1
+fi
 
 echo "============================================"
 echo "  所有评估已完成！"

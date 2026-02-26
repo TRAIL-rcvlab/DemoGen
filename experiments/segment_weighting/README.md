@@ -58,18 +58,19 @@ python train.py --config-path=../experiments/segment_weighting/config \
 
 ```bash
 cd experiments/segment_weighting
-# 评估所有实验（默认使用 robosuite 环境，20 episodes）
-bash eval_experiments.sh <train_output_base_dir>
 
-# 评估所有实验（使用 metaworld 环境，50 episodes）
-bash eval_experiments.sh <train_output_base_dir> metaworld 50
+# 批量评估：遍历基础目录下所有含 checkpoint 的子目录（默认 robosuite，20 episodes）
+bash eval_experiments.sh data/outputs/2024.01.01
 
-# 仅评估单个实验
-bash eval_experiments.sh <train_output_base_dir> robosuite 20 balanced
+# 批量评估：使用 metaworld 环境，50 episodes
+bash eval_experiments.sh data/outputs/2024.01.01 metaworld 50
+
+# 单个实验评估：指定具体的 checkpoint 目录
+bash eval_experiments.sh data/outputs/2024.01.01/12.00.00_train_xxx robosuite 20 balanced
 ```
 
-其中 `<train_output_base_dir>` 是训练输出的基础目录（包含各实验的子目录及 checkpoint），
-例如 `data/outputs/2024.01.01`。
+其中第一个参数是训练输出目录。批量模式会自动搜索该目录下所有包含 `checkpoints/latest.ckpt` 的子目录；
+单个实验模式（提供第 4 个参数 `exp_name`）则直接使用给定目录的 checkpoint。
 
 也可以直接调用 `diffusion_policies/eval.py` 评估单个 checkpoint：
 
