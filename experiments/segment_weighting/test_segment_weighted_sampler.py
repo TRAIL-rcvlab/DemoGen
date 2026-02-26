@@ -22,13 +22,13 @@ def _make_mock_replay_buffer(n_episodes=4, episode_length=100):
     """Create a minimal mock replay buffer for testing."""
 
     class MockReplayBuffer:
-        def __init__(self, n_eps, ep_len):
-            self.n_episodes = n_eps
-            self._episode_ends = np.cumsum([ep_len] * n_eps)
+        def __init__(self, n_episodes, episode_length):
+            self.n_episodes = n_episodes
+            self._episode_ends = np.cumsum([episode_length] * n_episodes)
             self._data = {
-                'agent_pos': np.random.randn(n_eps * ep_len, 12).astype(np.float32),
-                'action': np.random.randn(n_eps * ep_len, 12).astype(np.float32),
-                'point_cloud': np.random.randn(n_eps * ep_len, 1024, 3).astype(np.float32),
+                'agent_pos': np.random.randn(n_episodes * episode_length, 12).astype(np.float32),
+                'action': np.random.randn(n_episodes * episode_length, 12).astype(np.float32),
+                'point_cloud': np.random.randn(n_episodes * episode_length, 1024, 3).astype(np.float32),
             }
 
         @property
