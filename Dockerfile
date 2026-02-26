@@ -67,5 +67,6 @@ RUN cd demo_generation && pip install --no-cache-dir -e . && cd .. && \
     cd pcd_visualizer && pip install --no-cache-dir -e . && cd ..
 
 ENV HYDRA_FULL_ERROR=1
+ENV PYTHONPATH=/workspace/DemoGen:/workspace/DemoGen/diffusion_policies
 
 CMD ["bash"]

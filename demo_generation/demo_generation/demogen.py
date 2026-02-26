@@ -20,6 +20,11 @@ import logging
 class DemoGen:
     def __init__(self, cfg):
         self.data_root = cfg.data_root
+        if not os.path.isabs(self.data_root) and not os.path.exists(self.data_root):
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            resolved_data_root = os.path.join(repo_root, self.data_root)
+            if os.path.exists(resolved_data_root):
+                self.data_root = resolved_data_root
         self.source_name = cfg.source_name
         
         self.task_n_object = cfg.task_n_object
@@ -558,6 +563,9 @@ class DemoGen:
         print(f"inensity: {vfunc(intensity)}")
 
     def save_episodes(self, generated_episodes, save_dir):
+        import shutil
+        if os.path.exists(save_dir):
+            shutil.rmtree(save_dir)
         os.makedirs(save_dir, exist_ok=True)
         cprint(f"Saving data to {save_dir}", "green")
         # self.replay_buffer.save_to_store(save_dir)
@@ -657,8 +665,12 @@ class DemoGen:
                   verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
             
             fig.canvas.draw()
-            img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-            img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+            width, height = fig.canvas.get_width_height()
+            if hasattr(fig.canvas, 'tostring_rgb'):
+                img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+                img = img.reshape((height, width, 3))
+            else:
+                img = np.asarray(fig.canvas.buffer_rgba(), dtype=np.uint8)[..., :3]
             writer.append_data(img)
 
         writer.close()

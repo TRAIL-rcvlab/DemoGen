@@ -3,46 +3,53 @@
 # ============================================================
 #
 # Usage:
-#   docker compose build              # Build the image
-#   docker compose run train           # Run training
-#   docker compose run inference       # Run inference / evaluation
-#   docker compose run demogen         # Run demo generation
-#   docker compose run dev bash        # Interactive development shell
+#   docker compose up -d dev                                # Start persistent dev container
+#   docker compose exec dev bash                            # Enter dev shell
+#   docker compose --profile demogen run --rm demogen       # Run demo generation
+#   docker compose --profile train run --rm train           # Run training
+#   docker compose --profile inference run --rm inference   # Run evaluation
+
+x-common: &common
+  image: luobaigu/demogen:latest
+  working_dir: /workspace/DemoGen
+  volumes:
+    - ./:/workspace/DemoGen
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+  environment:
+    - NVIDIA_VISIBLE_DEVICES=all
+    - HYDRA_FULL_ERROR=1
+    - PYTHONPATH=/workspace/DemoGen:/workspace/DemoGen/diffusion_policies
 
 services:
-  # --- Base service (shared config) ---
-  base: &base
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: demogen:latest
-    volumes:
-      - ./data:/workspace/DemoGen/data
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - HYDRA_FULL_ERROR=1
+  # --- Interactive Development (default) ---
+  dev:
+    <<: *common
+    stdin_open: true
+    tty: true
+    command: bash -lc "sleep infinity"
 
   # --- Training ---
   train:
-    <<: *base
+    <<: *common
+    profiles: ["train"]
     working_dir: /workspace/DemoGen/diffusion_policies
     command: >
       bash train.sh
-      ${DEMO:-flower-demogen-test-grid-16}
+      ${DEMO:-jar}
       ${ALGO:-dp3}
-      ${TASK:-flower_demogen}
+      ${TASK:-oyhand}
       ${SEED:-0}
 
   # --- Inference / Evaluation ---
   inference:
-    <<: *base
+    <<: *common
+    profiles: ["inference"]
     working_dir: /workspace/DemoGen/experiments/segment_weighting
     command: >
       bash eval_experiments.sh
@@ -52,14 +59,14 @@ services:
 
   # --- Demo Generation ---
   demogen:
-    <<: *base
+    <<: *common
+    profiles: ["demogen"]
     working_dir: /workspace/DemoGen/demo_generation
     command: >
-      bash run_gen_demo.sh
-
-  # --- Interactive Development ---
-  dev:
-    <<: *base
-    stdin_open: true
-    tty: true
-    command: bash
+      python -W ignore gen_demo.py
+      --config-name=${DEMO_TASK:-flower}.yaml
+      data_root=../data
+      generation.range_name=${GEN_RANGE:-src}
+      generation.mode=${GEN_MODE:-random}
+      generation.n_gen_per_source=${N_GEN:-1}
+      generation.render_video=${RENDER_VIDEO:-False}
