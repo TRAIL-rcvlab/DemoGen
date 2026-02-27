@@ -11,7 +11,7 @@ import robomimic.utils.env_utils as EnvUtils
 import robomimic.utils.obs_utils as ObsUtils
 import robomimic.utils.file_utils as FileUtils
 from robosuite.controllers import load_composite_controller_config
-from pcd_visualizer import visualize_pointcloud
+from pcd_visualizer.pcd_visualizer import visualize_pointcloud
 
 
 TASK_BOUDNS = {

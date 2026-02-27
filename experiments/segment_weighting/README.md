@@ -60,17 +60,23 @@ python train.py --config-path=../experiments/segment_weighting/config \
 cd experiments/segment_weighting
 
 # 批量评估：遍历基础目录下所有含 checkpoint 的子目录（默认 robosuite，20 episodes）
-bash eval_experiments.sh data/outputs/2024.01.01
+bash eval_experiments.sh ../diffusion_policies/data/outputs/2026.02.26
+
+
+# （Docker 内等价写法）
+bash eval_experiments.sh /workspace/DemoGen/diffusion_policies/data/outputs/2026.02.26
 
 # 批量评估：使用 metaworld 环境，50 episodes
-bash eval_experiments.sh data/outputs/2024.01.01 metaworld 50
+bash eval_experiments.sh ../diffusion_policies/data/outputs/2026.02.26 metaworld 50
 
 # 单个实验评估：指定具体的 checkpoint 目录
-bash eval_experiments.sh data/outputs/2024.01.01/12.00.00_train_xxx robosuite 20 balanced
+bash eval_experiments.sh ../diffusion_policies/data/outputs/2026.02.26/17.09.36_train_diffusion_unet_hybrid_segment_weight_exp robosuite 20 balanced
 ```
 
-其中第一个参数是训练输出目录。批量模式会自动搜索该目录下所有包含 `checkpoints/latest.ckpt` 的子目录；
+其中第一个参数是训练输出目录。批量模式会自动搜索该目录下所有包含 checkpoint 的子目录（优先使用 `checkpoints/latest.ckpt`，若不存在则自动选择最新编号的 `*.ckpt`）；
 单个实验模式（提供第 4 个参数 `exp_name`）则直接使用给定目录的 checkpoint。
+
+> 注意：不要在终端里输入 Markdown 链接形式（例如 `[eval_experiments.sh](...)`），应直接输入命令本身。
 
 也可以直接调用 `diffusion_policies/eval.py` 评估单个 checkpoint：
 
@@ -80,11 +86,11 @@ python eval.py \
     --config-path=../experiments/segment_weighting/config \
     --config-name=segment_weight_exp \
     hydra.run.dir=<checkpoint_dir> \
-    task.env_runner._target_=diffusion_policies.env_runner.robosuite_runner.RobosuiteRunner \
-    task.env_runner.eval_episodes=20 \
-    task.env_runner.n_obs_steps='${n_obs_steps}' \
-    task.env_runner.n_action_steps='${n_action_steps}' \
-    task.env_runner.shape_meta='${shape_meta}'
+    +task.env_runner._target_=diffusion_policies.env_runner.robosuite_runner.RobosuiteRunner \
+    +task.env_runner.eval_episodes=20 \
+    +task.env_runner.n_obs_steps='${n_obs_steps}' \
+    +task.env_runner.n_action_steps='${n_action_steps}' \
+    +task.env_runner.shape_meta='${shape_meta}'
 ```
 
 ## 文件结构
@@ -115,3 +121,8 @@ experiments/segment_weighting/
 - **skill-1**: 帧 `[skill_1, motion_2)` — 第一阶段操作技能
 - **motion-2**: 帧 `[motion_2, skill_2)` — 过渡运动
 - **skill-2**: 帧 `[skill_2, end)` — 第二阶段操作技能
+
+
+# 缺失
+docker环境中缺少最终测试需要环境，补充安装
+pip install gym robommic

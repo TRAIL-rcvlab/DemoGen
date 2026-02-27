@@ -3,7 +3,7 @@ TO BE CLEANED
 """
 
 from diffusion_policies.common.replay_buffer import ReplayBuffer
-import pcd_visualizer
+import pcd_visualizer.pcd_visualizer as pcd_visualizer
 import numpy as np
 import os
 import zarr

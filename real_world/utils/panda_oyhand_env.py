@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation as R,Slerp
 from realsense_camera import RealSense_Camera
 from pcd_process import preprocess_point_cloud, pcd_crop, pcd_cluster
 
-from pcd_visualizer import visualize_pointcloud
+from pcd_visualizer.pcd_visualizer import visualize_pointcloud
 
 CAMERA_ID = 'f0211830'
 

@@ -26,6 +26,7 @@ x-common: &common
     - NVIDIA_VISIBLE_DEVICES=all
     - HYDRA_FULL_ERROR=1
     - PYTHONPATH=/workspace/DemoGen:/workspace/DemoGen/diffusion_policies
+    - LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/cv2/../../lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/root/.mujoco/mujoco210/bin
 
 services:
   # --- Interactive Development (default) ---

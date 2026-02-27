@@ -25,7 +25,7 @@ from diffusion_policies.workspace.base_workspace import BaseWorkspace
 from diffusion_policies.policy.diffusion_unet_hybrid_pointcloud_policy import DiffusionUnetHybridPointcloudPolicy
 from diffusion_policies.dataset.base_dataset import BasePointcloudDataset
 from diffusion_policies.env_runner.base_runner import BaseRunner
-# from diffusion_policies.env_runner.robosuite_runner import RobosuiteRunner
+from diffusion_policies.env_runner.robosuite_runner import RobosuiteRunner
 from diffusion_policies.common.checkpoint_util import TopKCheckpointManager
 from diffusion_policies.common.json_logger import JsonLogger
 from diffusion_policies.common.pytorch_util import dict_apply, optimizer_to

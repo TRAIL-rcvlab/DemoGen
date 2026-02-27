@@ -9,7 +9,7 @@ from scipy.spatial.transform import Rotation as R
 import fpsample
 from sklearn.cluster import DBSCAN
 from time import time
-import pcd_visualizer
+import pcd_visualizer.pcd_visualizer as pcd_visualizer
 from dataclasses import dataclass, field
 from typing import List
 from realsense_camera import RealSense_Camera

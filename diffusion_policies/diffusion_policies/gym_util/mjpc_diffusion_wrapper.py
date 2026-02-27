@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import numpy as np
 # import pytorch3d.ops as torch3d_ops
 import fpsample

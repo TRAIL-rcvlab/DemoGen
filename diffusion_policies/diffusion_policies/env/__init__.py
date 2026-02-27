@@ -3,5 +3,5 @@
 # from .metaworld import MetaWorldEnv
 # from .dexart import DexArtEnv
 
-# from .robosuite import Robosuite3DEnv
+from .robosuite import Robosuite3DEnv
 
