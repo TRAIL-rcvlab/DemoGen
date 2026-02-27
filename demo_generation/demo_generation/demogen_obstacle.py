@@ -111,7 +111,7 @@ class DemoAugmenter:
     def __init__(self, input_zarr_path, interpolate_step_size=0.01):
         self._load_from_zarr(input_zarr_path)
         self.interpolate_step_size = interpolate_step_size
-        assert(self.interpolate_step_size <= 0.01, "Interpolation step size should be less than 1 cm.")
+        assert self.interpolate_step_size <= 0.01, "Interpolation step size should be less than 1 cm."
 
     def _load_from_zarr(self, zarr_path):
         cprint(f"Loading data from {zarr_path}", "blue")
