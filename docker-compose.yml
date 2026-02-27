@@ -15,6 +15,10 @@ x-common: &common
   ipc: host
   volumes:
     - ./:/workspace/DemoGen
+    - ./scripts/entrypoint.sh:/entrypoint.sh
+    # 覆盖默认入口点，让它先跑你的脚本
+  entrypoint: ["/entrypoint.sh"]
+  network_mode: host
   deploy:
     resources:
       reservations:
@@ -27,7 +31,8 @@ x-common: &common
     - HYDRA_FULL_ERROR=1
     - PYTHONPATH=/workspace/DemoGen:/workspace/DemoGen/diffusion_policies
     - LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/cv2/../../lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/root/.mujoco/mujoco210/bin
-
+    # - HTTP_PROXY
+    # - HTTPS_PROXY
 services:
   # --- Interactive Development (default) ---
   dev:
@@ -35,6 +40,7 @@ services:
     stdin_open: true
     tty: true
     command: bash -lc "sleep infinity"
+
 
   # --- Training ---
   train:
