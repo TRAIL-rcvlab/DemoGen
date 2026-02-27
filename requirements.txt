@@ -25,6 +25,7 @@ fpsample==0.3.3
 
 # Simulation
 dm_control==1.0.8
+gym==0.21.0
 
 # Data
 zarr==2.12.0
