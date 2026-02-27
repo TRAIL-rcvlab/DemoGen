@@ -54,6 +54,66 @@ pip install -e .
 cd ..
 ```
 
+## 1.5. (Optional) Docker-based Installation
+
+A `docker-compose.yml` is provided as an alternative to the conda setup.
+
+```bash
+# Start an interactive dev container
+docker compose up -d dev
+docker compose exec dev bash
+
+# Or run a specific profile directly
+docker compose --profile demogen run --rm demogen
+docker compose --profile train    run --rm train
+docker compose --profile inference run --rm inference
+```
+
+#### Proxy Configuration (for server users behind a firewall)
+
+If your server requires an HTTP proxy (e.g., via an SSH reverse tunnel), export the
+proxy variables in the **host** shell before starting the containers.  The
+`docker-compose.yml` is configured to pass them through automatically:
+
+```bash
+# Example: SSH reverse tunnel forwarding a local SOCKS/HTTP proxy to port 1080
+ssh -R 1080:localhost:7897 user@your-server
+
+# On the server, export the proxy variables before starting Docker
+export http_proxy=http://127.0.0.1:1080
+export https_proxy=http://127.0.0.1:1080
+
+# Then start the container — the proxy settings will be available inside
+docker compose up -d dev
+```
+
+You can also add the `export` lines to your `~/.bashrc` (with an availability
+check) so they are set automatically on every login:
+
+```bash
+# Requires netcat (install with: sudo apt-get install netcat-openbsd)
+if nc -z 127.0.0.1 1080 2>/dev/null; then
+    export http_proxy=http://127.0.0.1:1080
+    export https_proxy=http://127.0.0.1:1080
+else
+    unset http_proxy
+    unset https_proxy
+fi
+```
+
+If `nc` is not available, you can use `curl` as an alternative check:
+
+```bash
+if curl -s --max-time 1 http://127.0.0.1:1080 >/dev/null 2>&1 || \
+   curl -s --max-time 1 --proxy http://127.0.0.1:1080 http://example.com >/dev/null 2>&1; then
+    export http_proxy=http://127.0.0.1:1080
+    export https_proxy=http://127.0.0.1:1080
+else
+    unset http_proxy
+    unset https_proxy
+fi
+```
+
 ## 2. Generate Synthetic Demos Using 𝑫𝒆𝒎𝒐𝑮𝒆𝒏
 #### 2.1. The 𝑫𝒆𝒎𝒐𝑮𝒆𝒏 implementation
 The 𝑫𝒆𝒎𝒐𝑮𝒆𝒏 procedure is implemented in `demo_generation/demo_generation/demogen.py`. To run the code, you need to specify a `.yaml` config file under the `demo_generation/demo_generation/config` folder, where we provide some examples for your reference. The outer entrance that combines the main code and configs is `demo_generation/gen_demo.py`.
