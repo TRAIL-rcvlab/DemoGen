@@ -10,7 +10,7 @@
 #   docker compose --profile inference run --rm inference   # Run evaluation
 
 x-common: &common
-  image: luobaigu/demogen:latest
+  image: luobaigu/demogen:v1.0 
   working_dir: /workspace/DemoGen
   ipc: host
   volumes:

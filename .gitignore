@@ -181,3 +181,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+mujoco210-linux-x86_64.tar.gz
+experiments/fixeddocker/wget-log
+opencode.jsonc

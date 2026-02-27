@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metaworld Teleoperation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0a0f;
+            color: #e0e0e0;
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ---- Header ---- */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #12121a, #1a1a2e);
+            border-bottom: 1px solid #2a2a3e;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(90deg, #4fc3f7, #7c4dff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #f44336;
+            transition: background 0.3s;
+        }
+
+        .status-dot.connected { background: #4caf50; }
+
+        /* ---- Main Layout ---- */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ---- Canvas Area ---- */
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #000;
+        }
+
+        #renderCanvas {
+            max-width: 100%;
+            max-height: 100%;
+            image-rendering: auto;
+        }
+
+        /* ---- HUD Overlay ---- */
+        .hud {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(6px);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hud-item .label { color: #888; }
+        .hud-item .value { color: #fff; font-weight: 600; }
+        .hud-item .value.positive { color: #4caf50; }
+        .hud-item .value.negative { color: #f44336; }
+
+        .recording-badge {
+            background: rgba(244, 67, 54, 0.85);
+            color: #fff;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .recording-badge.active { display: flex; }
+
+        .rec-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #fff;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* ---- Side Panel ---- */
+        .panel {
+            width: 280px;
+            background: linear-gradient(180deg, #12121a, #0f0f18);
+            border-left: 1px solid #2a2a3e;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .panel-section {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid #2a2a3e;
+            border-radius: 10px;
+            padding: 14px;
+        }
+
+        .panel-section h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #7c4dff;
+            margin-bottom: 12px;
+        }
+
+        /* Form elements */
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .form-row:last-child { margin-bottom: 0; }
+
+        .form-row label {
+            font-size: 12px;
+            color: #888;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:hover, select:focus {
+            border-color: #7c4dff;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 6px;
+            padding: 0;
+            border: none;
+            border-radius: 3px;
+            background: #2a2a3e;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            background: #7c4dff;
+            cursor: pointer;
+        }
+
+        .speed-value {
+            font-size: 12px;
+            color: #7c4dff;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:active { transform: scale(0.97); }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7c4dff, #536dfe);
+            color: #fff;
+        }
+
+        .btn-primary:hover { filter: brightness(1.15); }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #e53935);
+            color: #fff;
+        }
+
+        .btn-danger:hover { filter: brightness(1.15); }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4caf50, #43a047);
+            color: #fff;
+        }
+
+        .btn-success:hover { filter: brightness(1.15); }
+
+        .btn-outline {
+            background: transparent;
+            color: #7c4dff;
+            border: 1px solid #7c4dff;
+        }
+
+        .btn-outline:hover {
+            background: rgba(124, 77, 255, 0.1);
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Controls guide */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 4px 12px;
+            font-size: 12px;
+        }
+
+        .controls-grid .key {
+            background: #2a2a3e;
+            color: #4fc3f7;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .controls-grid .desc {
+            color: #888;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Active keys indicator */
+        .active-keys {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            min-height: 28px;
+        }
+
+        .key-indicator {
+            width: 32px; height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: monospace;
+            font-weight: 700;
+            color: #555;
+            transition: all 0.1s;
+        }
+
+        .key-indicator.active {
+            background: #7c4dff;
+            border-color: #7c4dff;
+            color: #fff;
+            box-shadow: 0 0 12px rgba(124, 77, 255, 0.4);
+        }
+
+        .gripper-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .gripper-bar {
+            flex: 1;
+            height: 6px;
+            background: #2a2a3e;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .gripper-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.15s, background 0.15s;
+        }
+
+        .gripper-fill.open  { width: 100%; background: #4caf50; }
+        .gripper-fill.closed { width: 30%; background: #f44336; }
+
+        /* Focus hint */
+        .focus-hint {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(124, 77, 255, 0.85);
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            display: none;
+            z-index: 10;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>🤖 Metaworld Teleoperation</h1>
+        <div class="connection-status">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+        <!-- Canvas -->
+        <div class="canvas-container" id="canvasContainer" tabindex="0">
+            <canvas id="renderCanvas" width="640" height="480"></canvas>
+
+            <!-- HUD -->
+            <div class="hud">
+                <div class="recording-badge" id="recBadge">
+                    <div class="rec-dot"></div>
+                    <span>REC</span>
+                    <span id="recEpisodes">0 eps</span>
+                </div>
+                <div class="hud-item">
+                    <span class="label">FPS</span>
+                    <span class="value" id="hudFps">0</span>
+                </div>
+                <div class="hud-item">
+                    <span class="label">Step</span>
+                    <span class="value" id="hudStep">0</span>
+                </div>
+                <div class="hud-item">
+                    <span class="label">Episode</span>
+                    <span class="value" id="hudEpisode">1</span>
+                </div>
+                <div class="hud-item">
+                    <span class="label">Reward</span>
+                    <span class="value" id="hudReward">0.0</span>
+                </div>
+                <div class="hud-item">
+                    <span class="label">Success</span>
+                    <span class="value" id="hudSuccess">—</span>
+                </div>
+            </div>
+
+            <!-- Focus hint -->
+            <div class="focus-hint" id="focusHint">
+                Click here to enable keyboard control
+            </div>
+        </div>
+
+        <!-- Side Panel -->
+        <div class="panel">
+            <!-- Task Selection -->
+            <div class="panel-section">
+                <h3>📋 Task</h3>
+                <div class="form-row">
+                    <label>Environment</label>
+                    <select id="taskSelect"></select>
+                </div>
+            </div>
+
+            <!-- Speed Control -->
+            <div class="panel-section">
+                <h3>⚡ Speed</h3>
+                <div class="form-row">
+                    <div style="display:flex;justify-content:space-between">
+                        <label>Movement Speed</label>
+                        <span class="speed-value" id="speedValue">0.10</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="0.01" max="0.5" step="0.01" value="0.1">
+                </div>
+            </div>
+
+            <!-- Active Keys -->
+            <div class="panel-section">
+                <h3>🎮 Input</h3>
+                <div class="form-row">
+                    <label>Active Keys</label>
+                    <div class="active-keys">
+                        <div class="key-indicator" id="keyQ">Q</div>
+                        <div class="key-indicator" id="keyW">W</div>
+                        <div class="key-indicator" id="keyE">E</div>
+                        <div class="key-indicator" id="keyA">A</div>
+                        <div class="key-indicator" id="keyS">S</div>
+                        <div class="key-indicator" id="keyD">D</div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label>Gripper</label>
+                    <div class="gripper-indicator">
+                        <span>Open</span>
+                        <div class="gripper-bar">
+                            <div class="gripper-fill open" id="gripperFill"></div>
+                        </div>
+                        <span>Close</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="panel-section">
+                <h3>🎬 Actions</h3>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="btnReset">Reset Environment (R)</button>
+                    <button class="btn btn-danger" id="btnRecord">⏺ Start Recording</button>
+                    <button class="btn btn-success" id="btnSave">💾 Save Data</button>
+                </div>
+            </div>
+
+            <!-- Controls Guide -->
+            <div class="panel-section">
+                <h3>📖 Controls</h3>
+                <div class="controls-grid">
+                    <span class="key">W/S</span><span class="desc">Y forward / back</span>
+                    <span class="key">A/D</span><span class="desc">X left / right</span>
+                    <span class="key">Q/E</span><span class="desc">Z up / down</span>
+                    <span class="key">LMB</span><span class="desc">Close gripper</span>
+                    <span class="key">RMB</span><span class="desc">Open gripper</span>
+                    <span class="key">R</span><span class="desc">Reset episode</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ================================================================
+    // Metaworld Web Teleoperation - Frontend
+    // ================================================================
+
+    const canvas = document.getElementById('renderCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvasContainer');
+
+    // WebSocket
+    let ws = null;
+    let reconnectTimer = null;
+    const WS_URL = `ws://${window.location.host}/ws`;
+
+    // State
+    let isRecording = false;
+    let hasFocus = false;
+
+    // ---- WebSocket Connection ----
+
+    function connect() {
+        if (ws && ws.readyState === WebSocket.OPEN) return;
+
+        ws = new WebSocket(WS_URL);
+
+        ws.onopen = () => {
+            console.log('WebSocket connected');
+            document.getElementById('statusDot').classList.add('connected');
+            document.getElementById('statusText').textContent = 'Connected';
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+        };
+
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'frame') {
+                renderFrame(msg);
+                updateHUD(msg);
+            }
+        };
+
+        ws.onclose = () => {
+            console.log('WebSocket disconnected');
+            document.getElementById('statusDot').classList.remove('connected');
+            document.getElementById('statusText').textContent = 'Disconnected';
+            // Auto-reconnect
+            if (!reconnectTimer) {
+                reconnectTimer = setTimeout(() => {
+                    reconnectTimer = null;
+                    connect();
+                }, 2000);
+            }
+        };
+
+        ws.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            ws.close();
+        };
+    }
+
+    function send(msg) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(msg));
+        }
+    }
+
+    // ---- Frame Rendering ----
+
+    const frameImg = new window.Image();
+    frameImg.onload = () => {
+        canvas.width = frameImg.width;
+        canvas.height = frameImg.height;
+        ctx.drawImage(frameImg, 0, 0);
+    };
+
+    function renderFrame(msg) {
+        frameImg.src = 'data:image/jpeg;base64,' + msg.image;
+    }
+
+    // ---- HUD Update ----
+
+    function updateHUD(msg) {
+        document.getElementById('hudFps').textContent = msg.fps;
+        document.getElementById('hudStep').textContent = msg.step;
+        document.getElementById('hudEpisode').textContent = msg.episode;
+
+        const rewardEl = document.getElementById('hudReward');
+        rewardEl.textContent = msg.reward.toFixed(4);
+        rewardEl.className = 'value ' + (msg.reward >= 0 ? 'positive' : 'negative');
+
+        const successEl = document.getElementById('hudSuccess');
+        successEl.textContent = msg.success ? '✓' : '—';
+        successEl.className = 'value ' + (msg.success ? 'positive' : '');
+
+        // Recording badge
+        isRecording = msg.recording;
+        const badge = document.getElementById('recBadge');
+        badge.classList.toggle('active', isRecording);
+        document.getElementById('recEpisodes').textContent = msg.episodes_recorded + ' eps';
+
+        // Update record button text
+        const btnRec = document.getElementById('btnRecord');
+        btnRec.textContent = isRecording ? '⏹ Stop Recording' : '⏺ Start Recording';
+
+        // Gripper indicator
+        const fill = document.getElementById('gripperFill');
+        if (msg.gripper === 'closed') {
+            fill.className = 'gripper-fill closed';
+        } else {
+            fill.className = 'gripper-fill open';
+        }
+    }
+
+    // ---- Keyboard Input ----
+
+    const trackedKeys = new Set(['w', 'a', 's', 'd', 'q', 'e']);
+    const activeKeys = new Set();
+
+    container.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+
+        if (trackedKeys.has(key) && !activeKeys.has(key)) {
+            activeKeys.add(key);
+            send({ type: 'key_down', key: key });
+            updateKeyIndicators();
+        }
+
+        if (key === 'r') {
+            send({ type: 'reset' });
+        }
+
+        // Prevent default for game keys
+        if (trackedKeys.has(key) || key === 'r') {
+            e.preventDefault();
+        }
+    });
+
+    container.addEventListener('keyup', (e) => {
+        const key = e.key.toLowerCase();
+        if (trackedKeys.has(key)) {
+            activeKeys.delete(key);
+            send({ type: 'key_up', key: key });
+            updateKeyIndicators();
+        }
+    });
+
+    function updateKeyIndicators() {
+        ['q', 'w', 'e', 'a', 's', 'd'].forEach(k => {
+            const el = document.getElementById('key' + k.toUpperCase());
+            el.classList.toggle('active', activeKeys.has(k));
+        });
+    }
+
+    // ---- Mouse Input (gripper) ----
+
+    container.addEventListener('mousedown', (e) => {
+        if (e.button === 0) {
+            send({ type: 'mouse', button: 'left', pressed: true });
+            e.preventDefault();
+        } else if (e.button === 2) {
+            send({ type: 'mouse', button: 'right', pressed: true });
+            e.preventDefault();
+        }
+    });
+
+    // Disable context menu on canvas
+    container.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // ---- Focus Management ----
+
+    const focusHint = document.getElementById('focusHint');
+
+    container.addEventListener('focus', () => {
+        hasFocus = true;
+        focusHint.style.display = 'none';
+    });
+
+    container.addEventListener('blur', () => {
+        hasFocus = false;
+        // Release all keys
+        activeKeys.forEach(key => {
+            send({ type: 'key_up', key: key });
+        });
+        activeKeys.clear();
+        updateKeyIndicators();
+        focusHint.style.display = 'block';
+    });
+
+    focusHint.addEventListener('click', () => {
+        container.focus();
+    });
+
+    // Show focus hint initially
+    focusHint.style.display = 'block';
+
+    // ---- Panel Controls ----
+
+    // Task selector
+    async function loadTasks() {
+        try {
+            const resp = await fetch('/api/tasks');
+            const data = await resp.json();
+            const select = document.getElementById('taskSelect');
+            data.tasks.forEach(task => {
+                const opt = document.createElement('option');
+                opt.value = task;
+                opt.textContent = task;
+                select.appendChild(opt);
+            });
+            // Set current task
+            select.value = 'pick-place-v3';
+        } catch (e) {
+            console.error('Failed to load tasks:', e);
+        }
+    }
+
+    document.getElementById('taskSelect').addEventListener('change', (e) => {
+        send({ type: 'set_task', task: e.target.value });
+    });
+
+    // Speed slider
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValue = document.getElementById('speedValue');
+
+    speedSlider.addEventListener('input', () => {
+        const val = parseFloat(speedSlider.value);
+        speedValue.textContent = val.toFixed(2);
+        send({ type: 'set_speed', speed: val });
+    });
+
+    // Buttons
+    document.getElementById('btnReset').addEventListener('click', () => {
+        send({ type: 'reset' });
+        container.focus();
+    });
+
+    document.getElementById('btnRecord').addEventListener('click', () => {
+        send({ type: 'toggle_record' });
+        container.focus();
+    });
+
+    document.getElementById('btnSave').addEventListener('click', () => {
+        send({ type: 'save' });
+        container.focus();
+    });
+
+    // ---- Initialize ----
+
+    loadTasks();
+    connect();
+
+    // Auto-focus canvas
+    setTimeout(() => container.focus(), 500);
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+# ============================================================
+# Metaworld Web Teleoperation Docker Compose
+# Headless server — access via browser at http://server_ip:9527
+# ============================================================
+#
+# Usage:
+#   docker compose -f docker-compose.teleop.yml build              # Build image
+#   docker compose -f docker-compose.teleop.yml up                 # Start server
+#   docker compose -f docker-compose.teleop.yml run --rm teleop    # Interactive
+#
+# Then open http://server_ip:9527 in your browser.
+#
+# Environment variables:
+#   TASK         - Metaworld task name   (default: pick-place-v3)
+#   SPEED        - Movement speed        (default: 0.1)
+#   SAVE_DIR     - Save directory        (default: data/datasets/teleop)
+#   PORT         - Server port           (default: 9527)
+#   FPS          - Target frame rate     (default: 30)
+
+services:
+  teleop:
+    build:
+      context: .
+      dockerfile: Dockerfile.teleop
+    image: demogen-teleop:latest
+    working_dir: /workspace/DemoGen
+    ipc: host
+
+    volumes:
+      # Mount project source (live editing)
+      - ./:/workspace/DemoGen
+      # Persistent data output
+      - ./data:/workspace/DemoGen/data
+
+    ports:
+      - "${PORT:-9527}:9527"
+
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - PYTHONPATH=/workspace/DemoGen
+      - MUJOCO_GL=egl
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    command: >
+      python -m metaworld_teleop.teleop_server
+      --port 9527
+      --task ${TASK:-pick-place-v3}
+      --speed ${SPEED:-0.1}
+      --fps ${FPS:-30}
+      --save-dir ${SAVE_DIR:-data/datasets/teleop}
+
+  # Interactive shell for debugging
+  shell:
+    build:
+      context: .
+      dockerfile: Dockerfile.teleop
+    image: demogen-teleop:latest
+    working_dir: /workspace/DemoGen
+    stdin_open: true
+    tty: true
+    ipc: host
+    profiles: ["debug"]
+
+    volumes:
+      - ./:/workspace/DemoGen
+      - ./data:/workspace/DemoGen/data
+
+    ports:
+      - "${PORT:-9528}:9527"
+
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - PYTHONPATH=/workspace/DemoGen
+      - MUJOCO_GL=egl
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    command: bash

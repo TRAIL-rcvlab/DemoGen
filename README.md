@@ -25,6 +25,65 @@ For action generation, 𝑫𝒆𝒎𝒐𝑮𝒆𝒏 adopts the idea of Task and 
 * **2025/04/02**, Officially released 𝑫𝒆𝒎𝒐𝑮𝒆𝒏.
 
 
+# 🤖 Metaworld Simulation Environment
+
+We integrate [Meta-World](https://github.com/Farama-Foundation/Metaworld) as a simulation benchmark for multi-task robotic manipulation. It provides 50 diverse manipulation tasks built on MuJoCo.
+
+## Clone (with submodule)
+```bash
+git clone --recurse-submodules https://github.com/YOUR_ORG/DemoGen.git
+# Or if already cloned:
+git submodule update --init --recursive
+```
+
+## Install Metaworld
+```bash
+pip install metaworld gymnasium
+# Or install from submodule:
+cd third_party/Metaworld && pip install -e . && cd ../..
+```
+
+## Keyboard/Mouse Teleoperation
+We provide a teleoperation script to control the Metaworld robot arm with keyboard and mouse, and collect demonstration data.
+
+```bash
+# Basic teleoperation (with GUI window)
+python metaworld_teleop/teleop_keyboard_mouse.py --task pick-place-v3
+
+# Save collected demonstrations to zarr
+python metaworld_teleop/teleop_keyboard_mouse.py --task pick-place-v3 --save-path data/datasets/teleop
+```
+
+**Controls:**
+| Key | Action |
+|-----|--------|
+| W / S | End-effector Y forward / backward |
+| A / D | End-effector X left / right |
+| Q / E | End-effector Z up / down |
+| Mouse Left | Close gripper (grasp) |
+| Mouse Right | Open gripper (release) |
+| R | Reset environment |
+| ESC | Quit and save |
+
+## Web Teleoperation (Headless Server)
+For headless servers, we provide a browser-based teleoperation interface.
+
+```bash
+# Start the server (headless, offscreen rendering)
+MUJOCO_GL=egl python -m metaworld_teleop.teleop_server --port 9527 --task pick-place-v3
+
+# Or via Docker
+docker compose -f docker-compose.teleop.yml build
+TASK=pick-place-v3 docker compose -f docker-compose.teleop.yml up
+```
+Then open `http://server_ip:9527` in your browser.
+
+## List Available Tasks
+```bash
+python -c "from metaworld_teleop.utils import list_available_tasks; print('\n'.join(list_available_tasks()))"
+```
+
+
 # 🚀 Quick Try in 5 Minutes
 ## 1. Minimal Installation
 #### 1.0. Create conda Env

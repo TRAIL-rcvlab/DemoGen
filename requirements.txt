@@ -25,6 +25,8 @@ fpsample==0.3.3
 
 # Simulation
 dm_control==1.0.8
+metaworld
+gymnasium
 
 # Data
 zarr==2.12.0
@@ -74,3 +76,9 @@ yapf==0.31.0
 psutil
 setuptools==78.1.1
 pynput
+
+# Web teleoperation
+fastapi
+uvicorn[standard]
+websockets
+Pillow
