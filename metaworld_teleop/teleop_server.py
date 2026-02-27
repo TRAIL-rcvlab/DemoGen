@@ -74,6 +74,7 @@ class TeleopState:
         self.step_count = 0
         self.episode_count = 0
         self.last_reward = 0.0
+        self.episode_total_reward = 0.0
         self.last_success = False
         self.obs = None
 
@@ -106,6 +107,7 @@ class TeleopState:
         self.step_count = 0
         self.episode_count = 1
         self.last_reward = 0.0
+        self.episode_total_reward = 0.0
         self.last_success = False
         self.keys_pressed.clear()
         self.gripper_target = 0.0
@@ -229,6 +231,7 @@ async def websocket_endpoint(ws: WebSocket):
                     state.collector.end_episode()
                 state.obs, _ = state.env.reset()
                 state.step_count = 0
+                state.episode_total_reward = 0.0
                 state.episode_count += 1
                 state.keys_pressed.clear()
                 state.gripper_target = 0.0
@@ -245,6 +248,7 @@ async def websocket_endpoint(ws: WebSocket):
             state.obs = next_obs
             state.step_count += 1
             state.last_reward = reward
+            state.episode_total_reward += reward
             state.last_success = info.get("success", False)
 
             # Render frame
@@ -264,7 +268,7 @@ async def websocket_endpoint(ws: WebSocket):
                 "image": frame_b64,
                 "step": state.step_count,
                 "reward": round(reward, 4),
-                "total_reward": round(state.last_reward, 4),
+                "total_reward": round(state.episode_total_reward, 4),
                 "episode": state.episode_count,
                 "recording": state.recording,
                 "success": state.last_success,
@@ -282,6 +286,7 @@ async def websocket_endpoint(ws: WebSocket):
                     state.collector.end_episode()
                 state.obs, _ = state.env.reset()
                 state.step_count = 0
+                state.episode_total_reward = 0.0
                 state.episode_count += 1
 
             # Frame rate control

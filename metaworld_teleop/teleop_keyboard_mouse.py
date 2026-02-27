@@ -46,6 +46,7 @@ class TeleopController:
 
         # Movement state (controlled by keyboard)
         self._keys_pressed = set()
+        self._lock = threading.Lock()
 
         # Gripper state (controlled by mouse)
         self._gripper_target = 0.0  # -1.0 = open, +1.0 = closed
@@ -87,17 +88,19 @@ class TeleopController:
         dx, dy, dz = 0.0, 0.0, 0.0
 
         # Keyboard -> translation
-        if "a" in self._keys_pressed:
+        with self._lock:
+            keys = set(self._keys_pressed)
+        if "a" in keys:
             dx -= self.speed
-        if "d" in self._keys_pressed:
+        if "d" in keys:
             dx += self.speed
-        if "w" in self._keys_pressed:
+        if "w" in keys:
             dy += self.speed
-        if "s" in self._keys_pressed:
+        if "s" in keys:
             dy -= self.speed
-        if "q" in self._keys_pressed:
+        if "q" in keys:
             dz += self.speed
-        if "e" in self._keys_pressed:
+        if "e" in keys:
             dz -= self.speed
 
         action = np.array([dx, dy, dz, self._gripper_target], dtype=np.float32)
@@ -119,7 +122,8 @@ class TeleopController:
         try:
             k = key.char.lower()
             if k in ("w", "a", "s", "d", "q", "e"):
-                self._keys_pressed.add(k)
+                with self._lock:
+                    self._keys_pressed.add(k)
             elif k == "r":
                 self._reset_requested = True
         except AttributeError:
@@ -130,7 +134,8 @@ class TeleopController:
     def _on_key_release(self, key):
         try:
             k = key.char.lower()
-            self._keys_pressed.discard(k)
+            with self._lock:
+                self._keys_pressed.discard(k)
         except AttributeError:
             pass
 

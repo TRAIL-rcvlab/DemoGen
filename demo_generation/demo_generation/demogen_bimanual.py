@@ -16,9 +16,6 @@ from matplotlib.ticker import FixedLocator, FormatStrFormatter
 from scipy.spatial.transform import Rotation as R
 import h5py
 import matplotlib.pyplot as plt
-import imageio
-import os
-from matplotlib.ticker import FormatStrFormatter
 
 vfunc = np.vectorize("{:.3f}".format)
 # sam_mask_root = "/home/dsy/shared/DemoGen-DP3/sam_mask"
@@ -31,7 +28,7 @@ TASK_SETTING = {
                 "object": "basket",
                 "target": None,
             },
-            "trans": [True, False],
+            "use_trans": [True, False],
             "rot": [False, False],
             # "stage_frame": [65, 270, 389], # [stage-1, pre-2, stage-2]
             "stage_frame": [22, 90, 130],
@@ -45,7 +42,7 @@ TASK_SETTING = {
                 "object": "banana",
                 "target": None,
             },
-            "trans": [False, False],
+            "use_trans": [False, False],
             "rot": [True, False],
             # "stage_frame": [65, 389], # [1(rot), 2(rot again)]
             "stage_frame": [22, 130],
@@ -60,7 +57,7 @@ class DemoAugmenter:
     def __init__(self, input_zarr_path, interpolate_step_size=0.01):
         self._load_from_zarr(input_zarr_path)
         self.interpolate_step_size = interpolate_step_size
-        assert(self.interpolate_step_size <= 0.01, "Interpolation step size should be less than 1 cm.")
+        assert self.interpolate_step_size <= 0.01, "Interpolation step size should be less than 1 cm."
 
     def _load_from_zarr(self, zarr_path):
         cprint(f"Loading data from {zarr_path}", "blue")
