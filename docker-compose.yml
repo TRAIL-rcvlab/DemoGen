@@ -27,6 +27,15 @@ x-common: &common
     - HYDRA_FULL_ERROR=1
     - PYTHONPATH=/workspace/DemoGen:/workspace/DemoGen/diffusion_policies
     - LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/cv2/../../lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/root/.mujoco/mujoco210/bin
+    # Proxy settings: passed through from the host environment when set.
+    # On the server, run: source ~/.bashrc  (or set manually) before docker compose up
+    # so that http_proxy / https_proxy are exported in the host shell.
+    - http_proxy
+    - https_proxy
+    - HTTP_PROXY
+    - HTTPS_PROXY
+    - no_proxy
+    - NO_PROXY
 
 services:
   # --- Interactive Development (default) ---
