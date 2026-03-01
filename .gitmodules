@@ -1,3 +1,6 @@
 [submodule "third_party/Metaworld"]
 	path = third_party/Metaworld
 	url = https://github.com/Farama-Foundation/Metaworld.git
+[submodule "third_party/joycon-robotics"]
+	path = third_party/joycon-robotics
+	url = https://github.com/box2ai-robotics/joycon-robotics.git
