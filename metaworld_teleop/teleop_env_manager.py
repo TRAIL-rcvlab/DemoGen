@@ -55,7 +55,7 @@ class TeleopState:
         self.seed = 42
         self.render_width = 640
         self.render_height = 480
-        self.jpeg_quality = 80
+        self.jpeg_quality = 60
         self.target_fps = 30
         self.debug = False
 

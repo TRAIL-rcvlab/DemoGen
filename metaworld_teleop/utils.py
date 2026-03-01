@@ -153,6 +153,9 @@ def create_metaworld_env(task_name="pick-place-v3", render_mode="human", seed=42
         env_name=task_name,
         seed=seed,
         render_mode=render_mode,
+        # Metaworld observations can fall outside declared bounds and trigger
+        # passive checker warnings on every step, which severely hurts FPS.
+        disable_env_checker=True,
     )
 
     # Strip the TimeLimit wrapper (default 500 steps) to prevent truncation

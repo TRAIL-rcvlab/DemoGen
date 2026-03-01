@@ -469,13 +469,33 @@ async def websocket_endpoint(ws: WebSocket):
             logger.error(f"WebSocket read error: {e}")
             state.running = False
 
-    # Start message reader in background
+    # Sender queue: keep only the latest frame to avoid websocket backpressure
+    # stalling simulation/control loop (major source of input lag/stutter).
+    send_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=1)
+
+    async def send_frames():
+        try:
+            while state.running:
+                payload = await send_queue.get()
+                await ws.send_text(payload)
+        except WebSocketDisconnect:
+            state.running = False
+        except Exception as e:
+            logger.error(f"WebSocket send error: {e}")
+            state.running = False
+
+    # Start reader/sender in background
     reader_task = asyncio.create_task(read_messages())
+    sender_task = asyncio.create_task(send_frames())
 
     frame_interval = 1.0 / state.target_fps
     fps_counter = 0
     fps_time = time.time()
     current_fps = 0.0
+    # Adaptive JPEG quality to trade smoothness vs clarity automatically.
+    max_jpeg_quality = int(state.jpeg_quality)
+    min_jpeg_quality = 60
+    dynamic_jpeg_quality = int(state.jpeg_quality)
 
     try:
         while state.running:
@@ -524,6 +544,7 @@ async def websocket_endpoint(ws: WebSocket):
             state.last_success = info.get("success", False)
 
             # Render frame (user-controllable camera)
+            state.jpeg_quality = dynamic_jpeg_quality
             frame_b64 = state.render_jpeg_base64()
 
             # FPS calculation
@@ -534,8 +555,15 @@ async def websocket_endpoint(ws: WebSocket):
                 fps_counter = 0
                 fps_time = time.time()
 
-            # Send frame + state to client
-            await ws.send_text(json.dumps({
+                # If backend falls behind, reduce JPEG quality a bit to regain FPS.
+                # If backend recovers, gradually restore quality.
+                if current_fps < (state.target_fps - 3) and dynamic_jpeg_quality > min_jpeg_quality:
+                    dynamic_jpeg_quality = max(min_jpeg_quality, dynamic_jpeg_quality - 3)
+                elif current_fps > (state.target_fps - 1) and dynamic_jpeg_quality < max_jpeg_quality:
+                    dynamic_jpeg_quality = min(max_jpeg_quality, dynamic_jpeg_quality + 1)
+
+            # Send frame + state to client (drop stale frame if queue is full)
+            payload = json.dumps({
                 "type": "frame",
                 "image": frame_b64,
                 "step": state.step_count,
@@ -549,7 +577,16 @@ async def websocket_endpoint(ws: WebSocket):
                 "episodes_recorded": state.collector.num_episodes if state.collector else 0,
                 "gripper": "closed" if state.gripper_target > 0 else "open",
                 "control_mode": state.control_mode,
-            }))
+            })
+            if send_queue.full():
+                try:
+                    send_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+            try:
+                send_queue.put_nowait(payload)
+            except asyncio.QueueFull:
+                pass
 
             # Auto-reset on TERMINATED only (task success/failure)
             # TimeLimit wrapper is stripped, so truncated should not occur
@@ -580,6 +617,7 @@ async def websocket_endpoint(ws: WebSocket):
     finally:
         state.running = False
         reader_task.cancel()
+        sender_task.cancel()
         logger.info("WebSocket session ended")
 
 
