@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ManiSkill 轨迹回放</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0f; color: #e0e0e0;
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden; height: 100vh;
+            display: flex; flex-direction: column;
+        }
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #12121a, #1a1a2e);
+            border-bottom: 1px solid #2a2a3e; flex-shrink: 0;
+        }
+        .header h1 {
+            font-size: 18px; font-weight: 600;
+            background: linear-gradient(90deg, #ff9800, #ff5722);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .header-links { display: flex; gap: 12px; align-items: center; }
+        .header-links a {
+            color: #7c4dff; text-decoration: none; font-size: 13px;
+            padding: 4px 10px; border-radius: 4px; border: 1px solid #7c4dff;
+            transition: all 0.2s;
+        }
+        .header-links a:hover { background: rgba(124,77,255,0.15); }
+        .connection-status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #f44336; transition: background 0.3s;
+        }
+        .status-dot.connected { background: #4caf50; }
+        .main { display: flex; flex: 1; overflow: hidden; }
+        .canvas-container {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            position: relative; background: #000; flex-direction: column;
+        }
+        #replayCanvas { width: 100%; height: calc(100% - 50px); object-fit: contain; }
+        .progress-bar-container {
+            width: 100%; height: 50px; background: #12121a;
+            display: flex; align-items: center; padding: 0 16px; gap: 12px;
+            border-top: 1px solid #2a2a3e;
+        }
+        .progress-bar {
+            flex: 1; height: 6px; background: #2a2a3e; border-radius: 3px;
+            cursor: pointer; position: relative;
+        }
+        .progress-fill {
+            height: 100%; background: linear-gradient(90deg, #ff9800, #ff5722);
+            border-radius: 3px; transition: width 0.1s;
+        }
+        .progress-text { font-size: 12px; font-family: monospace; color: #888; min-width: 80px; }
+        .playback-controls { display: flex; gap: 8px; align-items: center; }
+        .playback-btn {
+            background: #1a1a2e; border: 1px solid #3a3a5e; border-radius: 6px;
+            color: #e0e0e0; width: 32px; height: 32px; display: flex;
+            align-items: center; justify-content: center; cursor: pointer;
+            font-size: 14px; transition: all 0.2s;
+        }
+        .playback-btn:hover { border-color: #ff9800; color: #ff9800; }
+        .playback-btn.active { background: #ff9800; border-color: #ff9800; color: #fff; }
+        .speed-select {
+            background: #1a1a2e; color: #e0e0e0; border: 1px solid #3a3a5e;
+            border-radius: 4px; padding: 4px; font-size: 11px;
+        }
+        .hud {
+            position: absolute; top: 12px; left: 12px;
+            display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+        }
+        .hud-item {
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+            padding: 4px 10px; border-radius: 6px; font-size: 12px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .hud-item .label { color: #888; }
+        .hud-item .value { color: #fff; font-weight: 600; }
+        .hud-item .value.positive { color: #4caf50; }
+        .panel {
+            width: 320px; background: linear-gradient(180deg, #12121a, #0f0f18);
+            border-left: 1px solid #2a2a3e; padding: 12px;
+            display: flex; flex-direction: column; gap: 10px;
+            overflow-y: auto; flex-shrink: 0;
+        }
+        .panel-section {
+            background: rgba(255,255,255,0.03); border: 1px solid #2a2a3e;
+            border-radius: 10px; padding: 10px;
+        }
+        .panel-section h3 {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+            color: #ff9800; margin-bottom: 8px;
+        }
+        .form-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+        .form-row:last-child { margin-bottom: 0; }
+        .form-row label { font-size: 11px; color: #888; }
+        select, input[type="number"] {
+            width: 100%; background: #1a1a2e; color: #e0e0e0;
+            border: 1px solid #3a3a5e; border-radius: 6px;
+            padding: 6px; font-size: 12px; outline: none;
+        }
+        select:hover, select:focus { border-color: #ff9800; }
+        .btn {
+            width: 100%; padding: 8px; border: none; border-radius: 8px;
+            font-size: 11px; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: linear-gradient(135deg, #ff9800, #f57c00); color: #fff; }
+        .btn-primary:hover { filter: brightness(1.15); }
+        .btn-outline { background: transparent; color: #ff9800; border: 1px solid #ff9800; }
+        .btn-outline:hover { background: rgba(255,152,0,0.1); }
+        .btn-success { background: linear-gradient(135deg, #4caf50, #43a047); color: #fff; }
+        .btn-success:hover { filter: brightness(1.15); }
+        .btn-group { display: flex; flex-direction: column; gap: 5px; }
+        .demo-item {
+            padding: 6px 8px; border-radius: 6px; background: #1a1a2e;
+            cursor: pointer; margin-bottom: 4px; transition: background 0.15s;
+            border: 1px solid transparent;
+        }
+        .demo-item:hover { background: #2a2a3e; }
+        .demo-item.selected { border-color: #ff9800; background: rgba(255,152,0,0.1); }
+        .demo-name { font-size: 11px; color: #e0e0e0; font-weight: 500; }
+        .demo-meta { font-size: 10px; color: #666; margin-top: 2px; }
+        .info-note { font-size: 10px; color: #666; line-height: 1.4; margin-top: 4px; }
+        .empty-state {
+            text-align: center; padding: 20px; color: #555; font-size: 12px;
+        }
+        .replay-badge {
+            background: rgba(255,152,0,0.85); color: #fff; font-weight: 700;
+            padding: 4px 12px; border-radius: 6px; font-size: 12px;
+            display: none; align-items: center; gap: 6px;
+        }
+        .replay-badge.active { display: flex; }
+        .env-option-has-demos { }
+        .env-option-no-demos { color: #777; }
+        .download-prompt {
+            text-align: center; padding: 12px; color: #888; font-size: 12px;
+            background: rgba(255,152,0,0.05); border: 1px dashed #ff9800;
+            border-radius: 8px;
+        }
+        .download-prompt button {
+            margin-top: 8px; padding: 6px 16px; border: none; border-radius: 6px;
+            background: linear-gradient(135deg, #ff9800, #f57c00); color: #fff;
+            font-size: 11px; font-weight: 600; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .download-prompt button:hover { filter: brightness(1.15); }
+        .download-prompt button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .env-badge {
+            display: inline-block; font-size: 9px; padding: 1px 5px;
+            border-radius: 3px; margin-left: 6px; vertical-align: middle;
+        }
+        .env-badge.local { background: rgba(76,175,80,0.2); color: #4caf50; }
+        .env-badge.remote { background: rgba(255,152,0,0.15); color: #ff9800; }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>轨迹回放</h1>
+        <div class="header-links">
+            <a href="/">遥操作</a>
+            <a href="/debug">手柄调试</a>
+        </div>
+        <div class="connection-status">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">未连接</span>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="canvas-container">
+            <canvas id="replayCanvas" width="640" height="480"></canvas>
+            <div class="hud">
+                <div class="replay-badge" id="replayBadge">
+                    <span>回放中</span>
+                    <span id="replayProgress">0 / 0</span>
+                </div>
+                <div class="hud-item"><span class="label">步数</span><span class="value" id="hudStep">0</span></div>
+                <div class="hud-item"><span class="label">奖励</span><span class="value" id="hudReward">0.0</span></div>
+                <div class="hud-item"><span class="label">成功</span><span class="value" id="hudSuccess">--</span></div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="playback-controls">
+                    <button class="playback-btn" id="btnPlayPause" title="播放/暂停">||</button>
+                    <button class="playback-btn" id="btnStop" title="停止">X</button>
+                    <select class="speed-select" id="speedSelect" title="播放速度">
+                        <option value="0.25">0.25x</option>
+                        <option value="0.5">0.5x</option>
+                        <option value="1" selected>1x</option>
+                        <option value="2">2x</option>
+                        <option value="4">4x</option>
+                    </select>
+                </div>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                </div>
+                <div class="progress-text" id="progressText">0 / 0</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <!-- Demo Selection -->
+            <div class="panel-section">
+                <h3>演示数据集</h3>
+                <div class="form-row">
+                    <label>环境 <span id="envCount" style="color:#555;font-size:10px"></span></label>
+                    <select id="envSelect">
+                        <option value="">-- 加载任务列表中... --</option>
+                    </select>
+                </div>
+                <div class="form-row" style="flex-direction:row;align-items:center;gap:8px">
+                    <label style="white-space:nowrap;margin:0">
+                        <input type="checkbox" id="showAllTasks" checked style="vertical-align:middle"> 显示全部任务
+                    </label>
+                    <button class="btn btn-outline" id="btnRefreshDemos" style="padding:4px 8px;font-size:10px;width:auto;flex:1">刷新</button>
+                </div>
+                <div id="demoList" style="max-height:200px;overflow-y:auto">
+                    <div class="empty-state">选择环境查看演示数据</div>
+                </div>
+            </div>
+
+            <!-- Episode Selection -->
+            <div class="panel-section">
+                <h3>回放片段</h3>
+                <div class="form-row">
+                    <label>片段 ID</label>
+                    <input type="number" id="episodeId" value="0" min="0" step="1">
+                </div>
+                <div class="form-row">
+                    <label>控制模式</label>
+                    <select id="controlModeSelect">
+                        <option value="">从元数据自动检测</option>
+                        <option value="pd_ee_delta_pos">pd_ee_delta_pos (4-DOF)</option>
+                        <option value="pd_ee_delta_pose">pd_ee_delta_pose (7-DOF)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Replay Controls -->
+            <div class="panel-section">
+                <h3>回放控制</h3>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="btnStartReplay">开始视觉回放</button>
+                    <button class="btn btn-outline" id="btnDownloadDemos">下载演示数据</button>
+                    <button class="btn btn-success" id="btnExportDp3">当前环境重录并导出DP3 Zarr</button>
+                </div>
+                <div class="info-note" id="replayInfo" style="margin-top:8px">
+                    选择轨迹文件后点击"开始视觉回放"来流式播放渲染帧
+                </div>
+            </div>
+
+            <!-- Trajectory Info -->
+            <div class="panel-section">
+                <h3>轨迹信息</h3>
+                <div id="trajInfo" style="font-size:11px;color:#888;line-height:1.6">
+                    未选择轨迹文件
+                </div>
+            </div>
+
+            <!-- CLI Guide -->
+            <div class="panel-section">
+                <h3>命令行工具</h3>
+                <div style="font-size:10px;color:#666;font-family:monospace;line-height:1.5">
+                    <div style="margin-bottom:4px"><span style="color:#ff9800">下载数据:</span></div>
+                    <div style="padding-left:8px;margin-bottom:8px">python -m maniskill_teleop.replay download --env-id PickCube-v1</div>
+                    <div style="margin-bottom:4px"><span style="color:#ff9800">回放(转换):</span></div>
+                    <div style="padding-left:8px;margin-bottom:8px">python -m maniskill_teleop.replay replay --traj-path PATH -c pd_ee_delta_pos</div>
+                    <div style="margin-bottom:4px"><span style="color:#ff9800">列出数据:</span></div>
+                    <div style="padding-left:8px">python -m maniskill_teleop.replay list</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        'use strict';
+
+        const canvas = document.getElementById('replayCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ---- WebSocket ----
+        let ws = null;
+        let isPlaying = false;
+        let isPaused = false;
+        let selectedTrajPath = null;
+
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const WS_URL = `${wsProtocol}//${window.location.host}/ws/replay`;
+
+        // ---- Frame rendering ----
+        const frameImg = new Image();
+        let lastW = 0, lastH = 0;
+        frameImg.onload = () => {
+            if (frameImg.width !== lastW || frameImg.height !== lastH) {
+                canvas.width = frameImg.width;
+                canvas.height = frameImg.height;
+                lastW = frameImg.width;
+                lastH = frameImg.height;
+            }
+            ctx.drawImage(frameImg, 0, 0);
+        };
+
+        // ---- WebSocket connection ----
+        function connectWS() {
+            if (ws && ws.readyState === WebSocket.OPEN) return;
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                document.getElementById('statusDot').classList.add('connected');
+                document.getElementById('statusText').textContent = '已连接';
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    handleMessage(msg);
+                } catch(e) {
+                    console.error('Message error:', e);
+                }
+            };
+
+            ws.onclose = () => {
+                document.getElementById('statusDot').classList.remove('connected');
+                document.getElementById('statusText').textContent = '未连接';
+                isPlaying = false;
+                updatePlayUI();
+                setTimeout(connectWS, 2000);
+            };
+
+            ws.onerror = (err) => { console.error('WS error:', err); ws.close(); };
+        }
+
+        function sendWS(msg) {
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+        }
+
+        // ---- Message handler ----
+        function handleMessage(msg) {
+            if (msg.type === 'replay_frame') {
+                frameImg.src = 'data:image/jpeg;base64,' + msg.image;
+                document.getElementById('hudStep').textContent = msg.step;
+                document.getElementById('hudReward').textContent = msg.reward.toFixed(4);
+                const successEl = document.getElementById('hudSuccess');
+                successEl.textContent = msg.success ? '是' : '--';
+                successEl.className = 'value ' + (msg.success ? 'positive' : '');
+                document.getElementById('replayProgress').textContent = `${msg.step} / ${msg.total_steps}`;
+
+                // Progress bar
+                const pct = msg.total_steps > 0 ? (msg.step / msg.total_steps * 100) : 0;
+                document.getElementById('progressFill').style.width = pct + '%';
+                document.getElementById('progressText').textContent = `${msg.step} / ${msg.total_steps}`;
+
+            } else if (msg.type === 'replay_started') {
+                isPlaying = true; isPaused = false;
+                document.getElementById('replayBadge').classList.add('active');
+                document.getElementById('replayInfo').textContent = `正在回放片段 ${msg.episode_id}...`;
+                updatePlayUI();
+
+            } else if (msg.type === 'replay_ended') {
+                isPlaying = false; isPaused = false;
+                document.getElementById('replayBadge').classList.remove('active');
+                document.getElementById('replayInfo').textContent = '回放完成';
+                updatePlayUI();
+
+            } else if (msg.type === 'error') {
+                document.getElementById('replayInfo').textContent = '错误: ' + msg.message;
+                document.getElementById('replayInfo').style.color = '#f44336';
+                isPlaying = false; isPaused = false;
+                updatePlayUI();
+            }
+        }
+
+        function updatePlayUI() {
+            const btn = document.getElementById('btnPlayPause');
+            if (isPlaying && !isPaused) {
+                btn.textContent = '||';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = '>';
+                btn.classList.remove('active');
+            }
+        }
+
+        // ---- Playback controls ----
+        document.getElementById('btnPlayPause').addEventListener('click', () => {
+            if (isPlaying) {
+                if (isPaused) {
+                    sendWS({ type: 'resume' });
+                    isPaused = false;
+                } else {
+                    sendWS({ type: 'pause' });
+                    isPaused = true;
+                }
+                updatePlayUI();
+            }
+        });
+
+        document.getElementById('btnStop').addEventListener('click', () => {
+            sendWS({ type: 'stop' });
+            isPlaying = false; isPaused = false;
+            updatePlayUI();
+        });
+
+        document.getElementById('speedSelect').addEventListener('change', (e) => {
+            sendWS({ type: 'set_speed', speed: parseFloat(e.target.value) });
+        });
+
+        // ---- Start replay ----
+        document.getElementById('btnStartReplay').addEventListener('click', () => {
+            if (!selectedTrajPath) {
+                alert('请先选择一个轨迹文件');
+                return;
+            }
+            const episodeId = parseInt(document.getElementById('episodeId').value) || 0;
+            const controlMode = document.getElementById('controlModeSelect').value || null;
+            const speed = parseFloat(document.getElementById('speedSelect').value);
+
+            // Reconnect if needed
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                connectWS();
+                setTimeout(() => {
+                    sendWS({
+                        type: 'start_replay',
+                        traj_path: selectedTrajPath,
+                        episode_id: episodeId,
+                        control_mode: controlMode,
+                        speed: speed,
+                    });
+                }, 500);
+            } else {
+                sendWS({
+                    type: 'start_replay',
+                    traj_path: selectedTrajPath,
+                    episode_id: episodeId,
+                    control_mode: controlMode,
+                    speed: speed,
+                });
+            }
+
+            document.getElementById('replayInfo').textContent = '正在启动回放...';
+            document.getElementById('replayInfo').style.color = '#888';
+        });
+
+        // ---- Export DP3 zarr by replaying in current env ----
+        document.getElementById('btnExportDp3').addEventListener('click', async () => {
+            if (!selectedTrajPath) {
+                alert('请先选择一个轨迹文件');
+                return;
+            }
+
+            const btn = document.getElementById('btnExportDp3');
+            const oldText = btn.textContent;
+            const episodeId = parseInt(document.getElementById('episodeId').value) || 0;
+            const controlMode = document.getElementById('controlModeSelect').value || null;
+
+            btn.disabled = true;
+            btn.textContent = '导出中...';
+            document.getElementById('replayInfo').textContent = `正在当前环境重录并导出 DP3 Zarr (episode=${episodeId})...`;
+            document.getElementById('replayInfo').style.color = '#888';
+
+            try {
+                const resp = await fetch('/api/demos/export_dp3', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        traj_path: selectedTrajPath,
+                        episode_id: episodeId,
+                        control_mode: controlMode,
+                        n_points: 512,
+                    }),
+                });
+                const data = await resp.json();
+                if (!resp.ok || data.status !== 'ok') {
+                    throw new Error(data.error || data.message || '导出失败');
+                }
+                document.getElementById('replayInfo').textContent = `导出完成: ${data.zarr_path}`;
+                document.getElementById('replayInfo').style.color = '#4caf50';
+            } catch (e) {
+                document.getElementById('replayInfo').textContent = `导出失败: ${e.message || e}`;
+                document.getElementById('replayInfo').style.color = '#f44336';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = oldText;
+            }
+        });
+
+        // ---- Demo list ----
+        // allTasks: [{env_id, has_demos, downloadable, num_files, total_episodes}, ...]
+        // allDemos: [{env_id, source, filename, traj_path, num_episodes, control_mode, is_replayed}, ...]
+        let allTasks = [];
+        let allDemos = [];
+
+        async function loadAllData() {
+            // Fetch tasks and demos in parallel
+            const [tasksResp, demosResp] = await Promise.all([
+                fetch('/api/available_tasks').catch(() => null),
+                fetch('/api/demos').catch(() => null),
+            ]);
+
+            if (tasksResp && tasksResp.ok) {
+                const data = await tasksResp.json();
+                allTasks = (data.tasks || []).map(t => ({
+                    ...t,
+                    downloadable: !!t.downloadable,
+                }));
+            }
+            if (demosResp && demosResp.ok) {
+                const data = await demosResp.json();
+                allDemos = data.demos || [];
+            }
+
+            populateEnvDropdown();
+            renderDemoList(allDemos);
+        }
+
+        function populateEnvDropdown() {
+            const envSelect = document.getElementById('envSelect');
+            const showAll = document.getElementById('showAllTasks').checked;
+
+            envSelect.innerHTML = '<option value="">-- 全部环境 --</option>';
+
+            const tasksToShow = showAll ? allTasks : allTasks.filter(t => t.has_demos);
+
+            // Group: local demos first, then officially downloadable, then not downloadable
+            const withDemos = tasksToShow.filter(t => t.has_demos);
+            const downloadableNoDemos = tasksToShow.filter(t => !t.has_demos && t.downloadable);
+            const unavailableNoDemos = tasksToShow.filter(t => !t.has_demos && !t.downloadable);
+
+            if (showAll) {
+                // Optgroup for tasks with local demos
+                if (withDemos.length > 0) {
+                    const grpLocal = document.createElement('optgroup');
+                    grpLocal.label = `已下载 (${withDemos.length})`;
+                    withDemos.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.env_id;
+                        const label = t.label ? ` - ${t.label}` : '';
+                        opt.textContent = `${t.env_id}${label}  [${t.num_files}文件, ${t.total_episodes}条]`;
+                        opt.className = 'env-option-has-demos';
+                        grpLocal.appendChild(opt);
+                    });
+                    envSelect.appendChild(grpLocal);
+                }
+
+                if (downloadableNoDemos.length > 0) {
+                    const grpRemote = document.createElement('optgroup');
+                    grpRemote.label = `可下载(官方) (${downloadableNoDemos.length})`;
+                    downloadableNoDemos.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.env_id;
+                        const label = t.label ? ` - ${t.label}` : '';
+                        opt.textContent = `${t.env_id}${label}`;
+                        opt.className = 'env-option-no-demos';
+                        grpRemote.appendChild(opt);
+                    });
+                    envSelect.appendChild(grpRemote);
+                }
+
+                if (unavailableNoDemos.length > 0) {
+                    const grpUnavailable = document.createElement('optgroup');
+                    grpUnavailable.label = `暂无官方下载 (${unavailableNoDemos.length})`;
+                    unavailableNoDemos.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.env_id;
+                        const label = t.label ? ` - ${t.label}` : '';
+                        opt.textContent = `${t.env_id}${label}`;
+                        opt.className = 'env-option-no-demos';
+                        grpUnavailable.appendChild(opt);
+                    });
+                    envSelect.appendChild(grpUnavailable);
+                }
+            } else {
+                // Flat list (either all have demos or "show all" is off)
+                tasksToShow.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.env_id;
+                    const label = t.label ? ` - ${t.label}` : '';
+                    if (t.has_demos) {
+                        opt.textContent = `${t.env_id}${label}  [${t.num_files}文件, ${t.total_episodes}条]`;
+                        opt.className = 'env-option-has-demos';
+                    } else {
+                        opt.textContent = `${t.env_id}${label}`;
+                        opt.className = 'env-option-no-demos';
+                    }
+                    envSelect.appendChild(opt);
+                });
+            }
+
+            // Update count display
+            const countEl = document.getElementById('envCount');
+            const localCount = allTasks.filter(t => t.has_demos).length;
+            countEl.textContent = `(${localCount} 已下载 / ${allTasks.length} 总计)`;
+        }
+
+        function renderDemoList(demos, filterEnv) {
+            const listEl = document.getElementById('demoList');
+            const filtered = filterEnv ? demos.filter(d => d.env_id === filterEnv) : demos;
+
+            // Check if this is an env without demos
+            if (filterEnv && filtered.length === 0) {
+                const taskInfo = allTasks.find(t => t.env_id === filterEnv);
+                if (taskInfo && !taskInfo.has_demos && taskInfo.downloadable) {
+                    const label = taskInfo.label ? ` (${taskInfo.label})` : '';
+                    listEl.innerHTML = `
+                        <div class="download-prompt">
+                            <div><b>${filterEnv}</b>${label}</div>
+                            <div style="margin-top:4px;font-size:10px;color:#666">
+                                本地无数据，点击下载官方 ManiSkill 演示数据
+                            </div>
+                            <button id="btnInlineDownload">下载演示数据</button>
+                        </div>
+                    `;
+                    document.getElementById('btnInlineDownload').addEventListener('click', () => {
+                        downloadDemosForEnv(filterEnv);
+                    });
+                    return;
+                }
+                if (taskInfo && !taskInfo.has_demos) {
+                    listEl.innerHTML = '<div class="empty-state">该环境暂无本地数据，且官方未提供可下载演示</div>';
+                    return;
+                }
+                listEl.innerHTML = '<div class="empty-state">该环境暂无演示数据</div>';
+                return;
+            }
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">暂无本地数据，请选择任务后下载</div>';
+                return;
+            }
+
+            listEl.innerHTML = '';
+            filtered.forEach(demo => {
+                const item = document.createElement('div');
+                item.className = 'demo-item' + (selectedTrajPath === demo.traj_path ? ' selected' : '');
+                const tag = demo.is_replayed ? '<span style="color:#4caf50;font-size:9px"> [已转换]</span>' : '';
+                item.innerHTML = `
+                    <div class="demo-name">${demo.env_id} / ${demo.source}${tag}</div>
+                    <div class="demo-meta">${demo.filename} | ${demo.num_episodes} eps | ${demo.control_mode}</div>
+                `;
+                item.addEventListener('click', () => {
+                    selectedTrajPath = demo.traj_path;
+                    document.querySelectorAll('.demo-item').forEach(el => el.classList.remove('selected'));
+                    item.classList.add('selected');
+                    loadTrajInfo(demo.traj_path);
+                });
+                listEl.appendChild(item);
+            });
+        }
+
+        document.getElementById('envSelect').addEventListener('change', (e) => {
+            const env = e.target.value;
+            renderDemoList(allDemos, env || undefined);
+            // Update download button text
+            const btn = document.getElementById('btnDownloadDemos');
+            if (env) {
+                const taskInfo = allTasks.find(t => t.env_id === env);
+                if (taskInfo && !taskInfo.has_demos && taskInfo.downloadable) {
+                    btn.textContent = `下载: ${env}`;
+                    btn.style.borderColor = '#ff9800';
+                    btn.disabled = false;
+                } else if (taskInfo && !taskInfo.has_demos && !taskInfo.downloadable) {
+                    btn.textContent = '官方暂不支持下载';
+                    btn.style.borderColor = '';
+                    btn.disabled = true;
+                } else {
+                    btn.textContent = '重新下载数据';
+                    btn.style.borderColor = '';
+                    btn.disabled = false;
+                }
+            } else {
+                btn.textContent = '下载演示数据';
+                btn.style.borderColor = '';
+                btn.disabled = false;
+            }
+        });
+
+        document.getElementById('showAllTasks').addEventListener('change', () => {
+            populateEnvDropdown();
+        });
+
+        document.getElementById('btnRefreshDemos').addEventListener('click', loadAllData);
+
+        // ---- Download helper (shared by button and inline prompt) ----
+        async function downloadDemosForEnv(envId) {
+            const btn = document.getElementById('btnDownloadDemos');
+            const inlineBtn = document.getElementById('btnInlineDownload');
+            const origBtnText = btn.textContent;
+
+            btn.disabled = true;
+            btn.textContent = `正在下载 ${envId}...`;
+            if (inlineBtn) { inlineBtn.disabled = true; inlineBtn.textContent = '下载中...'; }
+
+            try {
+                const resp = await fetch(`/api/demos/download/${envId}`, { method: 'POST' });
+                const data = await resp.json();
+                if (data.status === 'ok') {
+                    btn.textContent = '下载完成!';
+                    if (inlineBtn) inlineBtn.textContent = '完成!';
+                    // Refresh to show new demos
+                    await loadAllData();
+                    // Re-select the env to show its demos
+                    document.getElementById('envSelect').value = envId;
+                    renderDemoList(allDemos, envId);
+                } else {
+                    btn.textContent = '下载失败';
+                    if (inlineBtn) inlineBtn.textContent = '失败';
+                }
+            } catch(e) {
+                btn.textContent = '下载出错';
+                if (inlineBtn) inlineBtn.textContent = '出错';
+            }
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = origBtnText;
+            }, 3000);
+        }
+
+        // ---- Trajectory info ----
+        async function loadTrajInfo(trajPath) {
+            const el = document.getElementById('trajInfo');
+            el.textContent = '加载中...';
+            try {
+                const resp = await fetch('/api/demos/trajectory_info?traj_path=' + encodeURIComponent(trajPath));
+                const info = await resp.json();
+                if (info.error) {
+                    el.textContent = '错误: ' + info.error;
+                    return;
+                }
+                let html = `<div><b>环境:</b> ${info.env_id || '未知'}</div>`;
+                html += `<div><b>片段数:</b> ${info.num_episodes || info.h5_episodes || '?'}</div>`;
+                if (info.control_mode) html += `<div><b>控制模式:</b> ${info.control_mode}</div>`;
+                if (info.step_stats) html += `<div><b>步数:</b> 最小=${info.step_stats.min} 最大=${info.step_stats.max} 平均=${info.step_stats.mean.toFixed(1)}</div>`;
+                if (info.success_rate !== undefined) html += `<div><b>成功率:</b> ${(info.success_rate * 100).toFixed(1)}%</div>`;
+                if (info.action_shape) html += `<div><b>动作维度:</b> ${info.action_shape.join(' x ')}</div>`;
+                el.innerHTML = html;
+            } catch(e) {
+                el.textContent = '加载信息出错';
+            }
+        }
+
+        // ---- Download demos (main button) ----
+        document.getElementById('btnDownloadDemos').addEventListener('click', async () => {
+            const env = document.getElementById('envSelect').value;
+            if (!env) {
+                alert('请先选择一个环境');
+                return;
+            }
+            const taskInfo = allTasks.find(t => t.env_id === env);
+            if (taskInfo && !taskInfo.has_demos && !taskInfo.downloadable) {
+                alert('该环境不在 ManiSkill 官方可下载列表中，请使用本地采集数据');
+                return;
+            }
+            downloadDemosForEnv(env);
+        });
+
+        // ---- Init ----
+        connectWS();
+        loadAllData();
+    })();
+    </script>
+</body>
+</html>

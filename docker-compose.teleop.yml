@@ -4,9 +4,12 @@
 # ============================================================
 #
 # Usage:
-#   docker compose -f docker-compose.teleop.yml build              # Build image
+#   docker pull luobaigu/demogen_telop                             # Pull pre-built image
 #   docker compose -f docker-compose.teleop.yml up                 # Start server
 #   docker compose -f docker-compose.teleop.yml run --rm teleop    # Interactive
+#
+# Build locally (optional):
+#   docker compose -f docker-compose.teleop.yml build
 #
 # Then open http://server_ip:9527 in your browser.
 #
@@ -19,10 +22,12 @@
 
 services:
   teleop:
-    build:
-      context: .
-      dockerfile: Dockerfile.teleop
-    image: demogen-teleop:latest
+    # Pre-built cloud image (recommended)
+    image: luobaigu/demogen_telop
+    # Uncomment below to build locally instead:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.teleop
     working_dir: /workspace/DemoGen
     ipc: host
 
@@ -59,10 +64,11 @@ services:
 
   # Interactive shell for debugging
   shell:
-    build:
-      context: .
-      dockerfile: Dockerfile.teleop
-    image: demogen-teleop:latest
+    image: luobaigu/demogen_telop
+    # Uncomment below to build locally:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.teleop
     working_dir: /workspace/DemoGen
     stdin_open: true
     tty: true
@@ -80,7 +86,6 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - PYTHONPATH=/workspace/DemoGen
-      - MUJOCO_GL=egl
 
     deploy:
       resources:

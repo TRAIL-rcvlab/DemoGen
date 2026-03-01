@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JoyCon WebHID Posture Debugger</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121220;
+            color: #e0e0e0;
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #4fc3f7;
+            border-bottom: 2px solid #3a3a5e;
+            padding-bottom: 10px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .info {
+            background-color: #1a1a2e;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #7c4dff;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .btn {
+            background-color: #7c4dff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #651fff;
+        }
+
+        .btn:disabled {
+            background-color: #444;
+            color: #888;
+            cursor: not-allowed;
+        }
+
+        #3d-container {
+            width: 100%;
+            max-width: 800px;
+            height: 400px;
+            background-color: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .raw-data {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            width: 100%;
+            max-width: 800px;
+            gap: 20px;
+        }
+
+        .data-panel {
+            background-color: #1a1a2e;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            border: 1px solid #3a3a5e;
+        }
+
+        .data-panel h3 {
+            margin-top: 0;
+            color: #b39ddb;
+            border-bottom: 1px solid #3a3a5e;
+            padding-bottom: 5px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .data-val {
+            color: #4fc3f7;
+            font-weight: bold;
+        }
+    </style>
+    <!-- Three.js for 3D Arrow -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+
+<body>
+
+    <h1>🕹️ Joy-Con IMU (WebHID) Debugger</h1>
+
+    <div class="info">
+        <p><strong>使用方法：</strong></p>
+        <ol>
+            <li>确保手柄已通过蓝牙连接到本机系统。</li>
+            <li>点击下方 <strong>"Connect Joy-Con (WebHID)"</strong> 按钮。</li>
+            <li>在弹出的浏览器提示中选择你的 Joy-Con (L / R) 设备并允许连接。</li>
+            <li>程序将发送底层指令开启 IMU（陀螺仪+加速度计），你将能看到右边姿态数据和下方的3D方向箭头变化！</li>
+        </ol>
+        <p style="color:#ef5350; font-size:12px;">注：网页前端 WebHID
+            权限较高，需要在电脑端浏览器打开。如果你的服务器是远程的，请在本地电脑上配对蓝牙，然后在本机浏览器访问此页面测试。</p>
+    </div>
+
+    <button id="btnConnect" class="btn">🔌 Connect Joy-Con (WebHID)</button>
+
+    <div class="raw-data">
+        <div class="data-panel">
+            <h3>Euler Angles (Euler)</h3>
+            <div class="data-row"><span>Roll (翻滚):</span> <span class="data-val" id="valRoll">0.00</span></div>
+            <div class="data-row"><span>Pitch (俯仰):</span> <span class="data-val" id="valPitch">0.00</span></div>
+            <div class="data-row"><span>Yaw (偏航):</span> <span class="data-val" id="valYaw">0.00</span></div>
+        </div>
+        <div class="data-panel">
+            <h3>Raw Sensor Inputs</h3>
+            <div class="data-row"><span>Acc X:</span> <span class="data-val" id="valAx">0.00</span></div>
+            <div class="data-row"><span>Acc Y:</span> <span class="data-val" id="valAy">0.00</span></div>
+            <div class="data-row"><span>Acc Z:</span> <span class="data-val" id="valAz">0.00</span></div>
+            <div class="data-row"><span>Gyr X:</span> <span class="data-val" id="valGx">0.00</span></div>
+            <div class="data-row"><span>Gyr Y:</span> <span class="data-val" id="valGy">0.00</span></div>
+            <div class="data-row"><span>Gyr Z:</span> <span class="data-val" id="valGz">0.00</span></div>
+        </div>
+    </div>
+
+    <div id="3d-container">
+        <div id="status-overlay" style="position:absolute; top:20px; color:#aaa;">Waiting for connection...</div>
+    </div>
+
+    <script>
+        // --- 3D Scene Setup ---
+        const container = document.getElementById('3d-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+        camera.position.set(0, 3, 5);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setClearColor(0x000000, 0);
+        container.appendChild(renderer.domElement);
+
+        const gridHelper = new THREE.GridHelper(10, 10, 0x3a3a5e, 0x3a3a5e);
+        scene.add(gridHelper);
+        const axesHelper = new THREE.AxesHelper(2);
+        scene.add(axesHelper);
+
+        // Arrow Group representing the controller
+        const joyconGroup = new THREE.Group();
+
+        // Main body box
+        const geometry = new THREE.BoxGeometry(1.2, 0.3, 2.5);
+        const material = new THREE.MeshBasicMaterial({ color: 0x4fc3f7, wireframe: true });
+        const box = new THREE.Mesh(geometry, material);
+        joyconGroup.add(box);
+
+        // Forward arrow (pointing Z-)
+        const dir = new THREE.Vector3(0, 0, -1);
+        const origin = new THREE.Vector3(0, 0, 1.25);
+        const length = 1.5;
+        const hex = 0xffeb3b;
+        const arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex, 0.4, 0.3);
+        joyconGroup.add(arrowHelper);
+
+        scene.add(joyconGroup);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // --- WebHID Logic ---
+        let device = null;
+        let packetCounter = 0;
+
+        // Complementary Filter States
+        let r_roll = 0, r_pitch = 0, r_yaw = 0;
+        let lastTime = 0;
+
+        const btnConnect = document.getElementById('btnConnect');
+        const overlay = document.getElementById('status-overlay');
+
+        function updateUI(rx, ry, rz, ax, ay, az, gx, gy, gz) {
+            document.getElementById('valRoll').textContent = rx.toFixed(2);
+            document.getElementById('valPitch').textContent = ry.toFixed(2);
+            document.getElementById('valYaw').textContent = rz.toFixed(2);
+
+            document.getElementById('valAx').textContent = ax.toFixed(2);
+            document.getElementById('valAy').textContent = ay.toFixed(2);
+            document.getElementById('valAz').textContent = az.toFixed(2);
+
+            document.getElementById('valGx').textContent = gx.toFixed(2);
+            document.getElementById('valGy').textContent = gy.toFixed(2);
+            document.getElementById('valGz').textContent = gz.toFixed(2);
+
+            // Update 3D Model Rotation
+            // Three.js uses XYZ Euler order by default
+            joyconGroup.rotation.set(-rx, -rz, -ry);
+        }
+
+        async function sendSubcommand(cmd, subcmd, args) {
+            const data = new Uint8Array(10 + args.length);
+            data[0] = packetCounter & 0x0F; packetCounter++;
+            data[1] = 0x00;
+            data[2] = 0x01; // rumble flags...
+            data[3] = 0x40;
+            data[4] = 0x40;
+            data[5] = 0x00;
+            data[6] = 0x01;
+            data[7] = 0x40;
+            data[8] = 0x40;
+            data[9] = subcmd;
+            for (let i = 0; i < args.length; i++) {
+                data[10 + i] = args[i];
+            }
+            await device.sendReport(cmd, data);
+        }
+
+        btnConnect.addEventListener('click', async () => {
+            if (!("hid" in navigator)) {
+                alert("WebHID is not supported in this browser! Please use Chrome or Edge desktop.");
+                return;
+            }
+            try {
+                // Request Nintendo Vendor ID filters
+                const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x057E }] });
+                if (devices.length === 0) return;
+
+                device = devices[0];
+                await device.open();
+                console.log(`Connected to: ${device.productName}`);
+                btnConnect.disabled = true;
+                btnConnect.textContent = "Connected!";
+                overlay.textContent = "Enabled IMU... Receiving Data";
+
+                // Standard WebHID Event listener for input reports
+                device.addEventListener("inputreport", handleInputReport);
+
+                // Enable IMU Mode (Subcommand 0x40, arg 0x01)
+                await sendSubcommand(0x01, 0x40, [0x01]);
+
+                // Set input report mode to Standard Full (0x30)
+                // This triggers the 60hz IMU reports
+                await sendSubcommand(0x01, 0x03, [0x30]);
+
+            } catch (error) {
+                console.error("Connection failed:", error);
+                alert("Connection failed: " + error.message);
+            }
+        });
+
+        function handleInputReport(event) {
+            const { reportId, data } = event;
+            if (reportId !== 0x30) return; // Only process standard full mode reports
+
+            // The IMU data starts at offset 12 in the DataView (since reportId takes 1 byte, making data start at byte 1)
+            // But from standard docs: frame 1 accel X is at offset 13 from packet start.
+            // In WebHID event.data, byte 0 is offset 0.
+            // Offset mapping: 
+            // 13: Acc X (int16_t) -> ByteOffset = 12
+            // 15: Acc Y -> ByteOffset = 14
+            // 17: Acc Z -> ByteOffset = 16
+            // 19: Gyr X -> ByteOffset = 18
+            // 21: Gyr Y -> ByteOffset = 20
+            // 23: Gyr Z -> ByteOffset = 22
+
+            const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+            // JoyCon uses Little-Endian
+            const ax_raw = dv.getInt16(12, true);
+            const ay_raw = dv.getInt16(14, true);
+            const az_raw = dv.getInt16(16, true);
+            const gx_raw = dv.getInt16(18, true);
+            const gy_raw = dv.getInt16(20, true);
+            const gz_raw = dv.getInt16(22, true);
+
+            // Scale factors (approximate from reverse engineering)
+            const ACC_SCALE = 0.000244 * 9.8; // m/s2
+            const GYR_SCALE = 0.06103 * Math.PI / 180; // rad/s
+
+            // Map coordinate systems depending on Left or Right JoyCon (assuming Right or Pro controller standard)
+            // JoyCon coordinate system is a bit weird.
+            const ax = ay_raw * ACC_SCALE;
+            const ay = az_raw * ACC_SCALE;
+            const az = ax_raw * ACC_SCALE;
+
+            const gx = gy_raw * GYR_SCALE;
+            const gy = gz_raw * GYR_SCALE;
+            const gz = gx_raw * GYR_SCALE;
+
+            // Simple Complementary Filter
+            const now = performance.now();
+            if (lastTime === 0) lastTime = now;
+            const dt = (now - lastTime) / 1000.0;
+            lastTime = now;
+
+            // Accel angles
+            const accPitch = Math.atan2(ay, az);
+            const accRoll = Math.atan2(-ax, Math.sqrt(ay * ay + az * az));
+
+            // Integrate Gyro
+            r_pitch = r_pitch + gx * dt;
+            r_roll = r_roll + gy * dt;
+            r_yaw = r_yaw + gz * dt;
+
+            // Filter
+            const alpha = 0.96;
+            r_pitch = r_pitch * alpha + accPitch * (1 - alpha);
+            r_roll = r_roll * alpha + accRoll * (1 - alpha);
+
+            updateUI(r_roll, r_pitch, r_yaw, ax, ay, az, gx, gy, gz);
+        }
+    </script>
+</body>
+
+</html>

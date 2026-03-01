@@ -2,6 +2,8 @@ data/ckpts/*
 !data/ckpts/.gitkeep
 data/datasets/generated/*
 !data/datasets/generated/.gitkeep
+data/datasets/teleop/
+*.zarr
 data/videos/*
 !data/videos/.gitkeep
 
@@ -184,3 +186,5 @@ cython_debug/
 mujoco210-linux-x86_64.tar.gz
 experiments/fixeddocker/wget-log
 opencode.jsonc
+
+**/paper/**

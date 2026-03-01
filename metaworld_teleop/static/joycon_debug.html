@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JoyCon Debug - Button Mapping</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0f;
+            color: #e0e0e0;
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        h1 {
+            font-size: 22px;
+            margin-bottom: 6px;
+            background: linear-gradient(90deg, #4fc3f7, #7c4dff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+        .connect-bar {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 8px;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; color: #fff;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-connect { background: linear-gradient(135deg, #00c853, #1b5e20); }
+        .btn-connect:hover { filter: brightness(1.15); }
+        .btn-connect:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-export { background: linear-gradient(135deg, #7c4dff, #536dfe); }
+        .btn-export:hover { filter: brightness(1.15); }
+        .btn-import { background: linear-gradient(135deg, #ff9800, #f57c00); }
+        .btn-import:hover { filter: brightness(1.15); }
+        .btn-back { background: transparent; color: #7c4dff; border: 1px solid #7c4dff; text-decoration: none; display: inline-flex; align-items: center; }
+        .btn-back:hover { background: rgba(124, 77, 255, 0.1); }
+        .status { font-size: 13px; color: #888; }
+        .status.connected { color: #4caf50; }
+
+        .section { margin-bottom: 24px; }
+        .section h2 {
+            font-size: 14px; text-transform: uppercase; letter-spacing: 1px;
+            color: #7c4dff; margin-bottom: 10px;
+            border-bottom: 1px solid #2a2a3e; padding-bottom: 6px;
+        }
+
+        /* Button grid */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 8px;
+        }
+        .btn-row {
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid #2a2a3e;
+            border-radius: 8px; padding: 8px 12px;
+            transition: border-color 0.15s;
+        }
+        .btn-row.active {
+            border-color: #7c4dff;
+            background: rgba(124, 77, 255, 0.08);
+        }
+        .btn-name {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 12px; font-weight: 700; color: #4fc3f7;
+            min-width: 90px;
+        }
+        .btn-state {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #2a2a3e; border: 2px solid #3a3a5e;
+            transition: all 0.1s; flex-shrink: 0;
+        }
+        .btn-state.on {
+            background: #4caf50; border-color: #4caf50;
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+        }
+        .btn-input {
+            flex: 1; background: #1a1a2e; border: 1px solid #3a3a5e;
+            border-radius: 6px; padding: 5px 8px; font-size: 12px;
+            color: #e0e0e0; outline: none; transition: border-color 0.2s;
+            font-family: inherit;
+        }
+        .btn-input:focus { border-color: #7c4dff; }
+        .btn-input::placeholder { color: #555; }
+
+        /* Stick display */
+        .sticks-container {
+            display: flex; gap: 30px; flex-wrap: wrap; margin-top: 8px;
+        }
+        .stick-box {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid #2a2a3e; border-radius: 10px;
+            padding: 12px; text-align: center;
+        }
+        .stick-label { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .stick-canvas {
+            width: 120px; height: 120px;
+            background: #1a1a2e; border-radius: 50%;
+            border: 2px solid #3a3a5e; display: block; margin: 0 auto 6px;
+        }
+        .stick-values {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; color: #4fc3f7;
+        }
+
+        /* IMU */
+        .imu-values {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; color: #888; line-height: 1.6;
+        }
+
+        /* Export area */
+        .export-area {
+            margin-top: 12px;
+        }
+        .json-preview {
+            background: #1a1a2e; border: 1px solid #2a2a3e;
+            border-radius: 8px; padding: 12px; margin-top: 10px;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: #4fc3f7; max-height: 300px; overflow-y: auto;
+            white-space: pre-wrap; display: none;
+        }
+
+        .last-pressed {
+            font-size: 14px; color: #ff9800; font-weight: 600;
+            min-height: 24px; margin-bottom: 10px;
+        }
+
+        .actions-bar {
+            display: flex; gap: 10px; flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>JoyCon Debug - Button Mapping Tool</h1>
+    <p class="subtitle">Connect your Joy-Con via WebHID, press buttons to identify them, assign function names, then export as JSON.</p>
+
+    <div class="connect-bar">
+        <a href="/" class="btn btn-back">← Back to Teleop</a>
+        <button class="btn btn-connect" id="btnConnect">Connect Joy-Con (WebHID)</button>
+        <span class="status" id="connStatus">Not connected</span>
+    </div>
+
+    <div class="last-pressed" id="lastPressed"></div>
+
+    <div class="actions-bar">
+        <button class="btn btn-export" id="btnExport">Export JSON</button>
+        <button class="btn btn-import" id="btnImport">Import JSON</button>
+        <input type="file" id="fileImport" accept=".json" style="display:none">
+    </div>
+
+    <div class="section">
+        <h2>Right JoyCon Buttons</h2>
+        <div class="btn-grid" id="rightButtons"></div>
+    </div>
+
+    <div class="section">
+        <h2>Shared Buttons</h2>
+        <div class="btn-grid" id="sharedButtons"></div>
+    </div>
+
+    <div class="section">
+        <h2>Left JoyCon Buttons</h2>
+        <div class="btn-grid" id="leftButtons"></div>
+    </div>
+
+    <div class="section">
+        <h2>Analog Sticks</h2>
+        <div class="sticks-container">
+            <div class="stick-box">
+                <div class="stick-label">Left Stick</div>
+                <canvas class="stick-canvas" id="stickL" width="120" height="120"></canvas>
+                <div class="stick-values" id="stickLVal">H: 0  V: 0</div>
+            </div>
+            <div class="stick-box">
+                <div class="stick-label">Right Stick</div>
+                <canvas class="stick-canvas" id="stickR" width="120" height="120"></canvas>
+                <div class="stick-values" id="stickRVal">H: 0  V: 0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>IMU (Accelerometer / Gyroscope)</h2>
+        <div class="imu-values" id="imuValues">
+            Accel: X=0  Y=0  Z=0<br>
+            Gyro:  X=0  Y=0  Z=0
+        </div>
+    </div>
+
+    <div class="export-area">
+        <div class="json-preview" id="jsonPreview"></div>
+    </div>
+
+<script>
+(function() {
+    // ================================================================
+    //  Button definitions
+    // ================================================================
+    const RIGHT_BTNS = [
+        { id: 'btn_y',    label: 'Y',      byte: 2, bit: 0 },
+        { id: 'btn_x',    label: 'X',      byte: 2, bit: 1 },
+        { id: 'btn_b',    label: 'B',      byte: 2, bit: 2 },
+        { id: 'btn_a',    label: 'A',      byte: 2, bit: 3 },
+        { id: 'btn_sr_r', label: 'SR (R)', byte: 2, bit: 4 },
+        { id: 'btn_sl_r', label: 'SL (R)', byte: 2, bit: 5 },
+        { id: 'btn_r',    label: 'R',      byte: 2, bit: 6 },
+        { id: 'btn_zr',   label: 'ZR',     byte: 2, bit: 7 },
+    ];
+    const SHARED_BTNS = [
+        { id: 'btn_minus',   label: 'Minus (-)',  byte: 3, bit: 0 },
+        { id: 'btn_plus',    label: 'Plus (+)',   byte: 3, bit: 1 },
+        { id: 'btn_r_stick', label: 'R-Stick Press', byte: 3, bit: 2 },
+        { id: 'btn_l_stick', label: 'L-Stick Press', byte: 3, bit: 3 },
+        { id: 'btn_home',    label: 'Home',       byte: 3, bit: 4 },
+        { id: 'btn_capture', label: 'Capture',    byte: 3, bit: 5 },
+    ];
+    const LEFT_BTNS = [
+        { id: 'btn_down',  label: 'Down',   byte: 4, bit: 0 },
+        { id: 'btn_up',    label: 'Up',     byte: 4, bit: 1 },
+        { id: 'btn_right', label: 'Right',  byte: 4, bit: 2 },
+        { id: 'btn_left',  label: 'Left',   byte: 4, bit: 3 },
+        { id: 'btn_sr_l',  label: 'SR (L)', byte: 4, bit: 4 },
+        { id: 'btn_sl_l',  label: 'SL (L)', byte: 4, bit: 5 },
+        { id: 'btn_l',     label: 'L',      byte: 4, bit: 6 },
+        { id: 'btn_zl',    label: 'ZL',     byte: 4, bit: 7 },
+    ];
+
+    const ALL_BTNS = [...RIGHT_BTNS, ...SHARED_BTNS, ...LEFT_BTNS];
+
+    // State: button name → user-assigned function
+    const mappings = {};
+    ALL_BTNS.forEach(b => { mappings[b.id] = ''; });
+
+    // ================================================================
+    //  Build UI rows
+    // ================================================================
+    function buildRows(container, btns) {
+        const el = document.getElementById(container);
+        btns.forEach(b => {
+            const row = document.createElement('div');
+            row.className = 'btn-row';
+            row.id = 'row_' + b.id;
+            row.innerHTML = `
+                <div class="btn-state" id="state_${b.id}"></div>
+                <span class="btn-name">${b.label}</span>
+                <input class="btn-input" id="input_${b.id}" type="text"
+                    placeholder="assign function..."
+                    value="${mappings[b.id]}">
+            `;
+            el.appendChild(row);
+            // Sync input → mappings
+            row.querySelector('.btn-input').addEventListener('input', (e) => {
+                mappings[b.id] = e.target.value;
+            });
+        });
+    }
+    buildRows('rightButtons', RIGHT_BTNS);
+    buildRows('sharedButtons', SHARED_BTNS);
+    buildRows('leftButtons', LEFT_BTNS);
+
+    // ================================================================
+    //  Stick canvases
+    // ================================================================
+    const stickLCtx = document.getElementById('stickL').getContext('2d');
+    const stickRCtx = document.getElementById('stickR').getContext('2d');
+
+    function drawStick(ctx, h, v) {
+        const w = 120;
+        ctx.clearRect(0, 0, w, w);
+        // Background crosshair
+        ctx.strokeStyle = '#2a2a3e';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(w/2, 0); ctx.lineTo(w/2, w);
+        ctx.moveTo(0, w/2); ctx.lineTo(w, w/2);
+        ctx.stroke();
+        // Deadzone circle
+        ctx.strokeStyle = '#3a3a5e';
+        ctx.beginPath();
+        ctx.arc(w/2, w/2, 15, 0, Math.PI*2);
+        ctx.stroke();
+        // Stick position (map 0-4095 to 0-w)
+        const nx = (h / 4095) * (w - 16) + 8;
+        const ny = ((4095 - v) / 4095) * (w - 16) + 8; // invert Y for display
+        ctx.fillStyle = '#7c4dff';
+        ctx.shadowColor = 'rgba(124, 77, 255, 0.6)';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(nx, ny, 7, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+    drawStick(stickLCtx, 2048, 2048);
+    drawStick(stickRCtx, 2048, 2048);
+
+    // ================================================================
+    //  HID report parser (JS port of joycon_decoder.py parse_report)
+    // ================================================================
+    function bit(byte, offset) { return (byte >> offset) & 1; }
+
+    function int16le(hi, lo) {
+        const val = (lo << 8) | hi;
+        return val < 32768 ? val : val - 65536;
+    }
+
+    function parseReport(data) {
+        // data is Uint8Array, same layout as Python: data[0]=timer, data[2..4]=buttons, etc.
+        const r = {};
+        if (data.length < 12) return r;
+
+        const b3 = data[2], b4 = data[3], b5 = data[4];
+
+        // Buttons
+        ALL_BTNS.forEach(b => {
+            r[b.id] = bit(data[b.byte], b.bit) === 1;
+        });
+
+        // Sticks
+        r.stick_lh = data.length > 7 ? (data[5] | ((data[6] & 0x0F) << 8)) : 0;
+        r.stick_lv = data.length > 7 ? ((data[6] >> 4) | (data[7] << 4)) : 0;
+        r.stick_rh = data.length > 10 ? (data[8] | ((data[9] & 0x0F) << 8)) : 0;
+        r.stick_rv = data.length > 10 ? ((data[9] >> 4) | (data[10] << 4)) : 0;
+
+        // IMU
+        if (data.length > 23) {
+            r.accel_x = int16le(data[12], data[13]);
+            r.accel_y = int16le(data[14], data[15]);
+            r.accel_z = int16le(data[16], data[17]);
+            r.gyro_x  = int16le(data[18], data[19]);
+            r.gyro_y  = int16le(data[20], data[21]);
+            r.gyro_z  = int16le(data[22], data[23]);
+        }
+        return r;
+    }
+
+    // ================================================================
+    //  Update UI from parsed report
+    // ================================================================
+    const prevBtnState = {};
+    const lastPressedEl = document.getElementById('lastPressed');
+
+    function updateUI(r) {
+        ALL_BTNS.forEach(b => {
+            const on = !!r[b.id];
+            const stateEl = document.getElementById('state_' + b.id);
+            const rowEl = document.getElementById('row_' + b.id);
+            if (stateEl) stateEl.classList.toggle('on', on);
+            if (rowEl) rowEl.classList.toggle('active', on);
+
+            // Detect rising edge → show "last pressed"
+            if (on && !prevBtnState[b.id]) {
+                lastPressedEl.textContent = `Last pressed: ${b.label} (${b.id})`;
+            }
+            prevBtnState[b.id] = on;
+        });
+
+        // Sticks
+        drawStick(stickLCtx, r.stick_lh || 2048, r.stick_lv || 2048);
+        drawStick(stickRCtx, r.stick_rh || 2048, r.stick_rv || 2048);
+        document.getElementById('stickLVal').textContent =
+            `H: ${(r.stick_lh||0).toString().padStart(4)}  V: ${(r.stick_lv||0).toString().padStart(4)}`;
+        document.getElementById('stickRVal').textContent =
+            `H: ${(r.stick_rh||0).toString().padStart(4)}  V: ${(r.stick_rv||0).toString().padStart(4)}`;
+
+        // IMU
+        if (r.accel_x !== undefined) {
+            document.getElementById('imuValues').innerHTML =
+                `Accel: X=${r.accel_x}  Y=${r.accel_y}  Z=${r.accel_z}<br>` +
+                `Gyro:  X=${r.gyro_x}  Y=${r.gyro_y}  Z=${r.gyro_z}`;
+        }
+    }
+
+    // ================================================================
+    //  WebHID Connection
+    // ================================================================
+    let hidDevice = null;
+    const btnConnect = document.getElementById('btnConnect');
+    const connStatus = document.getElementById('connStatus');
+
+    if (!("hid" in navigator)) {
+        btnConnect.disabled = true;
+        connStatus.textContent = "WebHID not supported! See README for LAN setup.";
+        connStatus.style.color = '#f44336';
+    }
+
+    btnConnect.addEventListener('click', async () => {
+        if (!("hid" in navigator)) {
+            alert("WebHID not supported in this browser.\n\nIf accessing via LAN, see README for Chrome/Edge flags setup.");
+            return;
+        }
+        try {
+            const devices = await navigator.hid.requestDevice({
+                filters: [{ vendorId: 0x057E }]  // Nintendo
+            });
+            if (!devices.length) return;
+            hidDevice = devices[0];
+            await hidDevice.open();
+
+            connStatus.textContent = `Connected: ${hidDevice.productName} (pid=0x${hidDevice.productId.toString(16)})`;
+            connStatus.className = 'status connected';
+            btnConnect.disabled = true;
+            btnConnect.textContent = 'Joy-Con Connected';
+
+            // Enable standard report mode (0x30) with IMU
+            const enableIMU = new Uint8Array(48);
+            enableIMU[0] = 0x01;  // subcommand rumble + sub
+            enableIMU[10] = 0x40; // enable IMU
+            enableIMU[11] = 0x01;
+            await hidDevice.sendReport(0x01, enableIMU);
+            await new Promise(r => setTimeout(r, 50));
+
+            const setMode = new Uint8Array(48);
+            setMode[0] = 0x02;
+            setMode[10] = 0x03; // set input report mode
+            setMode[11] = 0x30; // standard full mode
+            await hidDevice.sendReport(0x01, setMode);
+
+            hidDevice.addEventListener('inputreport', (event) => {
+                if (event.reportId !== 0x30) return;
+                const data = new Uint8Array(event.data.buffer, event.data.byteOffset, event.data.byteLength);
+                const report = parseReport(data);
+                updateUI(report);
+            });
+        } catch (err) {
+            alert("Connection failed: " + err.message);
+        }
+    });
+
+    // Handle disconnect
+    if ("hid" in navigator) {
+        navigator.hid.addEventListener("disconnect", (event) => {
+            if (hidDevice && event.device === hidDevice) {
+                hidDevice = null;
+                connStatus.textContent = "Disconnected";
+                connStatus.className = 'status';
+                btnConnect.disabled = false;
+                btnConnect.textContent = 'Connect Joy-Con (WebHID)';
+            }
+        });
+    }
+
+    // ================================================================
+    //  Export / Import JSON
+    // ================================================================
+    const jsonPreview = document.getElementById('jsonPreview');
+
+    document.getElementById('btnExport').addEventListener('click', () => {
+        const output = {
+            _comment: "JoyCon button mapping - generated by joycon_debug.html",
+            _timestamp: new Date().toISOString(),
+            buttons: {},
+            sticks: {
+                left:  { horizontal: "stick_lh", vertical: "stick_lv" },
+                right: { horizontal: "stick_rh", vertical: "stick_rv" }
+            }
+        };
+        ALL_BTNS.forEach(b => {
+            output.buttons[b.id] = {
+                label: b.label,
+                function: mappings[b.id] || ""
+            };
+        });
+
+        const jsonStr = JSON.stringify(output, null, 2);
+
+        // Show preview
+        jsonPreview.textContent = jsonStr;
+        jsonPreview.style.display = 'block';
+
+        // Download file
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'joycon_mapping.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // Import
+    const fileImport = document.getElementById('fileImport');
+    document.getElementById('btnImport').addEventListener('click', () => {
+        fileImport.click();
+    });
+    fileImport.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                if (data.buttons) {
+                    Object.entries(data.buttons).forEach(([id, info]) => {
+                        const fn = typeof info === 'string' ? info : (info.function || '');
+                        if (mappings.hasOwnProperty(id)) {
+                            mappings[id] = fn;
+                            const input = document.getElementById('input_' + id);
+                            if (input) input.value = fn;
+                        }
+                    });
+                }
+                jsonPreview.textContent = JSON.stringify(data, null, 2);
+                jsonPreview.style.display = 'block';
+            } catch (err) {
+                alert("Invalid JSON file: " + err.message);
+            }
+        };
+        reader.readAsText(file);
+        fileImport.value = '';  // reset so same file can be re-selected
+    });
+
+})();
+</script>
+</body>
+</html>

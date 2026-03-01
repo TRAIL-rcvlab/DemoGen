@@ -1,0 +1,5 @@
+{
+    "python.defaultInterpreterPath": "/data2/axgu/micromamba/envs/metaworld_teleop/bin/python",
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python.analysis.autoImportCompletions": true
+}

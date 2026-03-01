@@ -56,7 +56,7 @@ class DemoCollector:
         """Record a single transition."""
         self._current_episode["observations"].append(np.array(obs, dtype=np.float32))
         self._current_episode["actions"].append(np.array(action, dtype=np.float32))
-        self._current_episode["rewards"].append(float(reward))
+        self._current_episode["rewards"].append(np.float32(reward))
         self._current_episode["dones"].append(bool(done))
         self._total_steps += 1
 
@@ -78,6 +78,19 @@ class DemoCollector:
         )
 
         # Reset buffer
+        self._current_episode = {
+            "observations": [],
+            "actions": [],
+            "rewards": [],
+            "dones": [],
+        }
+
+    def discard_episode(self):
+        """Discard the current in-progress episode without saving it."""
+        n_steps = len(self._current_episode["observations"])
+        if n_steps > 0:
+            self._total_steps -= n_steps
+            print(f"  Episode discarded: {n_steps} steps thrown away")
         self._current_episode = {
             "observations": [],
             "actions": [],
