@@ -70,19 +70,18 @@ def visualize_zarr(zarr_path: str, web_port: int = 9090):
     print(f"  Obs dim:  {obs.shape[1]}")
     print(f"  Act dim:  {actions.shape[1]}")
 
-    # Initialize Rerun for headless web viewing (Rerun 0.30 API)
+    # Initialize Rerun for headless web viewing (Rerun 0.30+ API)
     rr.init("metaworld_teleop_viz", spawn=False)
 
-    # Start web viewer on port 9090
-    print(f"  Starting Rerun web viewer on port {web_port}...")
-    rr.serve_web_viewer(open_browser=False, web_port=web_port)
-
-    # Serve data via gRPC
+    # 1. Serve gRPC FIRST - this buffers the logged data
     grpc_port = web_port + 1
-    server_uri = rr.serve_grpc(grpc_port=grpc_port)
-    print(f"  Serving data at {server_uri}")
-    print(f"  --> View at: http://0.0.0.0:{web_port} <--")
+    grpc_url = rr.serve_grpc(grpc_port=grpc_port)
+    print(f"  gRPC server: {grpc_url}")
 
+    # 2. Serve Web Viewer and connect it to the gRPC server
+    print(f"  Starting Rerun web viewer on port {web_port}...")
+    rr.serve_web_viewer(open_browser=False, web_port=web_port, connect_to=grpc_url)
+    print(f"  --> View at: http://127.0.0.1:{web_port} <--")
     rr.set_time("step", sequence=0)
 
     # Log metadata
