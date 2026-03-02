@@ -102,20 +102,20 @@ def visualize_zarr(zarr_path: str, web_port: int = 9090):
         episode_idx = np.searchsorted(episode_ends, step_idx, side="right")
 
         # Reward
-        rr.log("metrics/reward", rr.Scalar(float(rewards[step_idx])))
+        rr.log("metrics/reward", rr.Scalars(float(rewards[step_idx])))
 
         # Cumulative reward within episode
         ep_start = int(episode_ends[episode_idx - 1]) if episode_idx > 0 else 0
         cum_reward = float(np.sum(rewards[ep_start : step_idx + 1]))
-        rr.log("metrics/cumulative_reward", rr.Scalar(cum_reward))
+        rr.log("metrics/cumulative_reward", rr.Scalars(cum_reward))
 
         # Actions (4D: dx, dy, dz, gripper)
         act = actions[step_idx]
-        rr.log("actions/dx", rr.Scalar(float(act[0])))
-        rr.log("actions/dy", rr.Scalar(float(act[1])))
-        rr.log("actions/dz", rr.Scalar(float(act[2])))
+        rr.log("actions/dx", rr.Scalars(float(act[0])))
+        rr.log("actions/dy", rr.Scalars(float(act[1])))
+        rr.log("actions/dz", rr.Scalars(float(act[2])))
         if len(act) > 3:
-            rr.log("actions/gripper", rr.Scalar(float(act[3])))
+            rr.log("actions/gripper", rr.Scalars(float(act[3])))
 
         # End-effector position from observations
         # Metaworld obs: first 3 values are gripper xyz
