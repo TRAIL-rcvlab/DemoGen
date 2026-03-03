@@ -7,6 +7,11 @@ import os
 import time
 import numpy as np
 
+# --- numpy 2.x compatibility ---
+# np.product was removed in numpy 2.0; zarr still uses it transitively.
+if not hasattr(np, "product"):
+    np.product = np.prod
+
 try:
     import zarr
 except ImportError:
@@ -46,18 +51,21 @@ class DemoCollector:
             "actions": [],
             "rewards": [],
             "dones": [],
+            "images": [],
         }
 
         # All completed episodes
         self._episodes = []
         self._total_steps = 0
 
-    def step(self, obs, action, reward, done):
+    def step(self, obs, action, reward, done, image=None):
         """Record a single transition."""
         self._current_episode["observations"].append(np.array(obs, dtype=np.float32))
         self._current_episode["actions"].append(np.array(action, dtype=np.float32))
         self._current_episode["rewards"].append(np.float32(reward))
         self._current_episode["dones"].append(bool(done))
+        if image is not None:
+            self._current_episode["images"].append(np.array(image, dtype=np.uint8))
         self._total_steps += 1
 
     def end_episode(self):
@@ -65,9 +73,7 @@ class DemoCollector:
         if len(self._current_episode["observations"]) == 0:
             return
 
-        episode = {
-            k: np.array(v) for k, v in self._current_episode.items()
-        }
+        episode = {k: np.array(v) for k, v in self._current_episode.items()}
         self._episodes.append(episode)
 
         n_steps = len(episode["observations"])
@@ -83,6 +89,7 @@ class DemoCollector:
             "actions": [],
             "rewards": [],
             "dones": [],
+            "images": [],
         }
 
     def discard_episode(self):
@@ -96,6 +103,7 @@ class DemoCollector:
             "actions": [],
             "rewards": [],
             "dones": [],
+            "images": [],
         }
 
     def save(self, task_name="unknown"):
@@ -128,27 +136,52 @@ class DemoCollector:
         all_rewards = np.concatenate([ep["rewards"] for ep in self._episodes])
         all_dones = np.concatenate([ep["dones"] for ep in self._episodes])
 
+        has_images = all(
+            len(ep["images"]) == len(ep["observations"]) and len(ep["images"]) > 0
+            for ep in self._episodes
+        )
+        all_images = None
+        if has_images:
+            all_images = np.concatenate([ep["images"] for ep in self._episodes])
+
         # Compute episode end indices
         episode_ends = np.cumsum([len(ep["observations"]) for ep in self._episodes])
 
         # Save to zarr
         root = zarr.open(zarr_path, mode="w")
         data_group = root.create_group("data")
-        data_group.create_dataset("observations", data=all_obs, chunks=(1000, all_obs.shape[1]))
-        data_group.create_dataset("actions", data=all_actions, chunks=(1000, all_actions.shape[1]))
+        data_group.create_dataset(
+            "observations", data=all_obs, chunks=(1000, all_obs.shape[1])
+        )
+        data_group.create_dataset(
+            "actions", data=all_actions, chunks=(1000, all_actions.shape[1])
+        )
         data_group.create_dataset("rewards", data=all_rewards, chunks=(1000,))
         data_group.create_dataset("dones", data=all_dones, chunks=(1000,))
+        if all_images is not None:
+            data_group.create_dataset(
+                "images",
+                data=all_images,
+                chunks=(
+                    100,
+                    all_images.shape[1],
+                    all_images.shape[2],
+                    all_images.shape[3],
+                ),
+            )
 
         meta_group = root.create_group("meta")
         meta_group.create_dataset("episode_ends", data=episode_ends)
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  Data saved to: {zarr_path}")
         print(f"  Episodes: {len(self._episodes)}")
         print(f"  Total steps: {self._total_steps}")
         print(f"  Observations shape: {all_obs.shape}")
         print(f"  Actions shape: {all_actions.shape}")
-        print(f"{'='*60}\n")
+        if all_images is not None:
+            print(f"  Images shape: {all_images.shape}")
+        print(f"{'=' * 60}\n")
 
         return zarr_path
 

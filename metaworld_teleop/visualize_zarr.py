@@ -9,6 +9,7 @@ Usage:
 
 import argparse
 import sys
+from urllib.parse import quote
 import numpy as np
 
 try:
@@ -23,7 +24,12 @@ except ImportError:
     rr = None
 
 
-def visualize_zarr(zarr_path: str, web_port: int = 9090):
+def visualize_zarr(
+    zarr_path: str,
+    web_port: int = 9090,
+    show_scene: bool = False,
+    show_robot: bool = False,
+):
     """Load zarr dataset and visualize with Rerun web viewer."""
     if rr is None:
         print("ERROR: rerun-sdk not installed. Run: pip install rerun-sdk")
@@ -46,6 +52,18 @@ def visualize_zarr(zarr_path: str, web_port: int = 9090):
     has_robot_pc = "data/point_cloud_robot" in z
     has_object_pc = "data/point_cloud_objects" in z
 
+    image_key = None
+    image_candidates = [
+        "data/images",
+        "data/image",
+        "data/rgb",
+        "data/rgb_images",
+    ]
+    for key in image_candidates:
+        if key in z:
+            image_key = key
+            break
+
     object_names = []
     if "meta/object_names" in z:
         for name in z["meta/object_names"][:]:
@@ -55,6 +73,44 @@ def visualize_zarr(zarr_path: str, web_port: int = 9090):
                 object_names.append(str(name))
     elif has_object_pc:
         object_names = list(z["data/point_cloud_objects"].keys())
+
+    # Keep only task-relevant object clouds by default.
+    # Many datasets include robot and scene bodies in point_cloud_objects.
+    robot_like_tokens = {
+        "leftclaw",
+        "rightclaw",
+        "leftpad",
+        "rightpad",
+        "torso",
+        "head",
+        "screen",
+        "controller_box",
+        "robot",
+        "gripper",
+        "wrist",
+        "arm",
+        "hand",
+    }
+    scene_like_tokens = {
+        "table",
+        "pedestal",
+        "pedestal_feet",
+        "floor",
+        "wall",
+        "background",
+    }
+
+    all_object_names = list(object_names)
+    filtered_object_names = []
+    for name in object_names:
+        low = name.lower()
+        if any(tok in low for tok in robot_like_tokens):
+            continue
+        if any(tok in low for tok in scene_like_tokens):
+            continue
+        filtered_object_names.append(name)
+
+    object_names = filtered_object_names
 
     def color_from_name(name):
         seed = sum(ord(ch) for ch in name)
@@ -69,6 +125,37 @@ def visualize_zarr(zarr_path: str, web_port: int = 9090):
     print(f"  Episodes: {n_episodes}")
     print(f"  Obs dim:  {obs.shape[1]}")
     print(f"  Act dim:  {actions.shape[1]}")
+    if has_object_pc:
+        print(f"  Object clouds (raw): {len(all_object_names)}")
+        print(f"  Object clouds (kept): {len(object_names)}")
+    if image_key is None:
+        print(
+            "  [INFO] No RGB image stream found in zarr (expected one of: data/images, data/image, data/rgb, data/rgb_images)"
+        )
+    else:
+        print(f"  RGB stream: {image_key}")
+
+    # Diagnose potential planar collapse in saved point clouds.
+    # This does not alter data; it only prints a warning for debugging.
+    def _z_span(pts):
+        if len(pts) == 0:
+            return 0.0
+        z_col = np.asarray(pts)[:, 2]
+        return float(np.max(z_col) - np.min(z_col))
+
+    if has_object_pc and len(object_names) > 0:
+        sample_idx = 0
+        planar_count = 0
+        for obj_name in object_names:
+            if obj_name not in z["data/point_cloud_objects"]:
+                continue
+            pts = z[f"data/point_cloud_objects/{obj_name}"][sample_idx]
+            if _z_span(pts) < 1e-3:
+                planar_count += 1
+        if planar_count > 0:
+            print(
+                f"  [WARN] {planar_count}/{len(object_names)} object clouds have tiny z-span at step 0; check depth->pointcloud pipeline if this looks wrong."
+            )
 
     # Initialize Rerun for headless web viewing (Rerun 0.30+ API)
     rr.init("metaworld_teleop_viz", spawn=False)
@@ -81,7 +168,8 @@ def visualize_zarr(zarr_path: str, web_port: int = 9090):
     # 2. Serve Web Viewer and connect it to the gRPC server
     print(f"  Starting Rerun web viewer on port {web_port}...")
     rr.serve_web_viewer(open_browser=False, web_port=web_port, connect_to=grpc_url)
-    print(f"  --> View at: http://127.0.0.1:{web_port} <--")
+    viewer_url = f"http://127.0.0.1:{web_port}/?url={quote(grpc_url, safe='')}"
+    print(f"  --> View at: {viewer_url} <--")
     rr.set_time("step", sequence=0)
 
     # Log metadata
@@ -92,6 +180,13 @@ def visualize_zarr(zarr_path: str, web_port: int = 9090):
             f"Steps: {n_steps} | Episodes: {n_episodes} | Obs: {obs.shape} | Act: {actions.shape}"
         ),
     )
+    if image_key is None:
+        rr.log(
+            "camera/rgb_status",
+            rr.TextLog(
+                "No RGB images in this dataset. Recordings must save data/images (or data/image/data/rgb/data/rgb_images) to visualize camera frames."
+            ),
+        )
 
     # Log time-series data
     for step_idx in range(n_steps):
@@ -137,18 +232,18 @@ def visualize_zarr(zarr_path: str, web_port: int = 9090):
             rr.log("events/episode_end", rr.TextLog(f"Episode {episode_idx} ended"))
 
         # Log images and point clouds if they exist in the zarr
-        if "data/images" in z and step_idx < z["data/images"].shape[0]:
-            img = z["data/images"][step_idx]
+        if image_key is not None and step_idx < z[image_key].shape[0]:
+            img = z[image_key][step_idx]
             rr.log("camera/rgb", rr.Image(img))
 
-        if has_scene_pc:
+        if show_scene and has_scene_pc:
             scene_pc = z["data/point_cloud"][step_idx]
             rr.log(
                 "point_cloud/scene",
                 rr.Points3D(scene_pc, radii=[0.002], colors=[[180, 180, 180]]),
             )
 
-        if has_robot_pc:
+        if show_robot and has_robot_pc:
             robot_pc = z["data/point_cloud_robot"][step_idx]
             rr.log(
                 "point_cloud/robot",
@@ -173,7 +268,7 @@ def visualize_zarr(zarr_path: str, web_port: int = 9090):
                 rr.log("camera/point_cloud", rr.Points3D(pc, radii=[0.002]))
 
     print(f"✓ Visualization complete. {n_steps} steps logged.")
-    print(f"  View at: http://0.0.0.0:{web_port}")
+    print(f"  View at: {viewer_url}")
     # Keep alive so web viewer stays accessible
     print("  Press Ctrl+C to stop.")
     try:
@@ -196,6 +291,16 @@ def main():
     parser.add_argument(
         "--save", type=str, default=None, help="Save to .rrd file instead"
     )
+    parser.add_argument(
+        "--show-scene",
+        action="store_true",
+        help="Show scene/background point cloud (disabled by default)",
+    )
+    parser.add_argument(
+        "--show-robot",
+        action="store_true",
+        help="Show robot point cloud (disabled by default)",
+    )
 
     args = parser.parse_args()
 
@@ -206,9 +311,19 @@ def main():
         rr.init("metaworld_teleop_viz")
         rr.save(args.save)
         # Just log data without web viewer
-        visualize_zarr(args.zarr_path, web_port=0)
+        visualize_zarr(
+            args.zarr_path,
+            web_port=0,
+            show_scene=args.show_scene,
+            show_robot=args.show_robot,
+        )
     else:
-        visualize_zarr(args.zarr_path, web_port=args.port)
+        visualize_zarr(
+            args.zarr_path,
+            web_port=args.port,
+            show_scene=args.show_scene,
+            show_robot=args.show_robot,
+        )
 
 
 if __name__ == "__main__":

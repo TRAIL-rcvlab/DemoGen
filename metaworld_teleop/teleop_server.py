@@ -32,7 +32,7 @@ from PIL import Image
 
 # --- numpy 2.x compatibility ---
 # np.product was removed in numpy 2.0; some transitive deps still use it.
-if not hasattr(np, 'product'):
+if not hasattr(np, "product"):
     np.product = np.prod
 
 try:
@@ -46,7 +46,10 @@ except ImportError:
     )
 
 from metaworld_teleop.joycon_decoder import (
-    JoyConState, parse_report, JOYCON_R_PRODUCT_ID, JOYCON_L_PRODUCT_ID,
+    JoyConState,
+    parse_report,
+    JOYCON_R_PRODUCT_ID,
+    JOYCON_L_PRODUCT_ID,
 )
 
 # ---------------------------------------------------------------------------
@@ -72,7 +75,9 @@ def _create_teleop_state():
         from metaworld_teleop.teleop_env_manager import TeleopState
     return TeleopState()
 
+
 logger = logging.getLogger("teleop_server")
+
 
 # Now that imports are done, configure offscreen rendering for headless servers.
 # Try EGL first (GPU-accelerated), fall back to osmesa (software).
@@ -87,6 +92,7 @@ def _setup_offscreen_rendering():
         os.environ["MUJOCO_GL"] = backend
         try:
             import mujoco
+
             # Quick test: if mujoco can be used, this backend works
             logger.info(f"Offscreen rendering backend: {backend}")
             return
@@ -96,6 +102,7 @@ def _setup_offscreen_rendering():
     # If neither works, unset and let it fail later with a clear error
     os.environ.pop("MUJOCO_GL", None)
     logger.warning("No offscreen rendering backend available (tried egl, osmesa)")
+
 
 _setup_offscreen_rendering()
 
@@ -125,6 +132,7 @@ joycon_state = JoyConState()  # Stateful decoder for raw HID reports
 # ---------------------------------------------------------------------------
 # REST API
 # ---------------------------------------------------------------------------
+
 
 @app.head("/")
 @app.get("/", response_class=HTMLResponse)
@@ -175,20 +183,25 @@ async def api_tasks():
 @app.get("/api/status")
 async def api_status():
     """Get current teleoperation status."""
-    return JSONResponse(content={
-        "simulator": SIMULATOR,
-        "task": state.task_name,
-        "episode": state.episode_count,
-        "step": state.step_count,
-        "recording": state.recording,
-        "episodes_recorded": state.collector.num_episodes if state.collector else 0,
-        "total_steps_recorded": state.collector.total_steps if state.collector else 0,
-    })
+    return JSONResponse(
+        content={
+            "simulator": SIMULATOR,
+            "task": state.task_name,
+            "episode": state.episode_count,
+            "step": state.step_count,
+            "recording": state.recording,
+            "episodes_recorded": state.collector.num_episodes if state.collector else 0,
+            "total_steps_recorded": state.collector.total_steps
+            if state.collector
+            else 0,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Demos API (ManiSkill trajectory replay)
 # ---------------------------------------------------------------------------
+
 
 @app.get("/api/available_tasks")
 async def api_available_tasks():
@@ -198,10 +211,16 @@ async def api_available_tasks():
     Used by the replay UI to show downloadable tasks.
     """
     if SIMULATOR != "maniskill":
-        return JSONResponse(content={"tasks": [], "error": "Only available for ManiSkill simulator"})
+        return JSONResponse(
+            content={"tasks": [], "error": "Only available for ManiSkill simulator"}
+        )
     try:
         from maniskill_teleop.replay import list_local_demos
-        from maniskill_teleop.utils import get_task_label, list_official_downloadable_tasks
+        from maniskill_teleop.utils import (
+            get_task_label,
+            list_official_downloadable_tasks,
+        )
+
         all_tasks = _get_task_list()
         demos = list_local_demos()
         downloadable_tasks = set(list_official_downloadable_tasks())
@@ -222,7 +241,9 @@ async def api_available_tasks():
                 "has_demos": task in local_envs,
                 "downloadable": task in downloadable_tasks,
                 "num_files": local_envs[task]["num_files"] if task in local_envs else 0,
-                "total_episodes": local_envs[task]["total_episodes"] if task in local_envs else 0,
+                "total_episodes": local_envs[task]["total_episodes"]
+                if task in local_envs
+                else 0,
             }
             result.append(entry)
         return JSONResponse(content={"tasks": result})
@@ -234,9 +255,12 @@ async def api_available_tasks():
 async def api_demos():
     """List locally available ManiSkill demo datasets."""
     if SIMULATOR != "maniskill":
-        return JSONResponse(content={"demos": [], "error": "Only available for ManiSkill simulator"})
+        return JSONResponse(
+            content={"demos": [], "error": "Only available for ManiSkill simulator"}
+        )
     try:
         from maniskill_teleop.replay import list_local_demos
+
         demos = list_local_demos()
         return JSONResponse(content={"demos": demos})
     except Exception as e:
@@ -247,9 +271,12 @@ async def api_demos():
 async def api_demos_for_env(env_id: str):
     """List demos for a specific environment."""
     if SIMULATOR != "maniskill":
-        return JSONResponse(content={"demos": [], "error": "Only available for ManiSkill simulator"})
+        return JSONResponse(
+            content={"demos": [], "error": "Only available for ManiSkill simulator"}
+        )
     try:
         from maniskill_teleop.replay import list_local_demos
+
         demos = list_local_demos(env_id=env_id)
         return JSONResponse(content={"demos": demos, "env_id": env_id})
     except Exception as e:
@@ -260,7 +287,9 @@ async def api_demos_for_env(env_id: str):
 async def api_download_demos(env_id: str):
     """Download official ManiSkill demos for an environment (blocking)."""
     if SIMULATOR != "maniskill":
-        return JSONResponse(content={"error": "Only available for ManiSkill simulator"}, status_code=400)
+        return JSONResponse(
+            content={"error": "Only available for ManiSkill simulator"}, status_code=400
+        )
     try:
         from maniskill_teleop.replay import download_demos
         from maniskill_teleop.utils import list_official_downloadable_tasks
@@ -280,7 +309,10 @@ async def api_download_demos(env_id: str):
         if success:
             return JSONResponse(content={"status": "ok", "env_id": env_id})
         else:
-            return JSONResponse(content={"status": "error", "message": "Download failed"}, status_code=500)
+            return JSONResponse(
+                content={"status": "error", "message": "Download failed"},
+                status_code=500,
+            )
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
@@ -292,20 +324,25 @@ async def api_replay_hint():
     Full replay (control mode conversion) is CPU-intensive and best done via CLI.
     For visual replay (streaming frames), use the /ws/replay WebSocket.
     """
-    return JSONResponse(content={
-        "hint": "Use CLI for trajectory conversion: python -m maniskill_teleop.replay replay --help",
-        "visual_replay": "Connect to /ws/replay WebSocket for frame-by-frame visual replay",
-    })
+    return JSONResponse(
+        content={
+            "hint": "Use CLI for trajectory conversion: python -m maniskill_teleop.replay replay --help",
+            "visual_replay": "Connect to /ws/replay WebSocket for frame-by-frame visual replay",
+        }
+    )
 
 
 @app.get("/api/demos/trajectory_info")
 async def api_trajectory_info(traj_path: str):
     """Get info about a trajectory file."""
     if SIMULATOR != "maniskill":
-        return JSONResponse(content={"error": "Only available for ManiSkill simulator"}, status_code=400)
+        return JSONResponse(
+            content={"error": "Only available for ManiSkill simulator"}, status_code=400
+        )
     try:
         from maniskill_teleop.replay import load_trajectory_metadata
         import h5py
+
         meta = load_trajectory_metadata(traj_path)
         info = {"traj_path": traj_path}
         if meta:
@@ -327,7 +364,9 @@ async def api_trajectory_info(traj_path: str):
                     "max": int(max(steps)),
                     "mean": float(np.mean(steps)),
                 }
-                info["success_rate"] = sum(1 for e in episodes if e.get("success", False)) / len(episodes)
+                info["success_rate"] = sum(
+                    1 for e in episodes if e.get("success", False)
+                ) / len(episodes)
 
         # H5 structure
         with h5py.File(traj_path, "r") as f:
@@ -347,13 +386,17 @@ async def api_trajectory_info(traj_path: str):
 async def api_export_dp3(payload: dict):
     """Replay one episode in current env and export DP3-format zarr."""
     if SIMULATOR != "maniskill":
-        return JSONResponse(content={"error": "Only available for ManiSkill simulator"}, status_code=400)
+        return JSONResponse(
+            content={"error": "Only available for ManiSkill simulator"}, status_code=400
+        )
     try:
         from maniskill_teleop.replay import export_episode_to_dp3_zarr
 
         traj_path = payload.get("traj_path")
         if not traj_path:
-            return JSONResponse(content={"error": "traj_path is required"}, status_code=400)
+            return JSONResponse(
+                content={"error": "traj_path is required"}, status_code=400
+            )
 
         episode_id = int(payload.get("episode_id", 0))
         control_mode = payload.get("control_mode")
@@ -369,28 +412,34 @@ async def api_export_dp3(payload: dict):
         )
         return JSONResponse(content={"status": "ok", **result})
     except Exception as e:
-        return JSONResponse(content={"status": "error", "error": str(e)}, status_code=500)
+        return JSONResponse(
+            content={"status": "error", "error": str(e)}, status_code=500
+        )
 
 
 @app.get("/api/datasets")
 async def api_datasets():
     """List saved zarr datasets."""
     import glob
+
     datasets = []
     pattern = os.path.join(state.save_dir, "*.zarr")
     for path in sorted(glob.glob(pattern)):
         name = os.path.basename(path)
         try:
             import zarr
+
             z = zarr.open(path, "r")
             n_steps = z["data/observations"].shape[0] if "data/observations" in z else 0
             n_episodes = len(z["meta/episode_ends"]) if "meta/episode_ends" in z else 0
-            datasets.append({
-                "name": name,
-                "steps": n_steps,
-                "episodes": n_episodes,
-                "path": path,
-            })
+            datasets.append(
+                {
+                    "name": name,
+                    "steps": n_steps,
+                    "episodes": n_episodes,
+                    "path": path,
+                }
+            )
         except Exception:
             datasets.append({"name": name, "steps": 0, "episodes": 0, "path": path})
     return JSONResponse(content={"datasets": datasets})
@@ -400,6 +449,7 @@ async def api_datasets():
 async def api_dataset_detail(name: str):
     """Get details of a specific zarr dataset."""
     import zarr
+
     path = os.path.join(state.save_dir, name)
     if not os.path.exists(path):
         return JSONResponse(content={"error": "Not found"}, status_code=404)
@@ -408,29 +458,31 @@ async def api_dataset_detail(name: str):
         obs = z["data/observations"]
         actions = z["data/actions"]
         rewards = z["data/rewards"]
-        episode_ends = z["meta/episode_ends"][:].tolist() if "meta/episode_ends" in z else []
+        episode_ends = (
+            z["meta/episode_ends"][:].tolist() if "meta/episode_ends" in z else []
+        )
         reward_list = z["data/rewards"][:].tolist()
-        return JSONResponse(content={
-            "name": name,
-            "obs_shape": list(obs.shape),
-            "action_shape": list(actions.shape),
-            "total_steps": obs.shape[0],
-            "episodes": len(episode_ends),
-            "episode_ends": episode_ends,
-            "rewards": reward_list,
-            "reward_sum": float(rewards[:].sum()),
-            "reward_mean": float(rewards[:].mean()),
-        })
+        return JSONResponse(
+            content={
+                "name": name,
+                "obs_shape": list(obs.shape),
+                "action_shape": list(actions.shape),
+                "total_steps": obs.shape[0],
+                "episodes": len(episode_ends),
+                "episode_ends": episode_ends,
+                "rewards": reward_list,
+                "reward_sum": float(rewards[:].sum()),
+                "reward_mean": float(rewards[:].mean()),
+            }
+        )
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
-
-
-
 
 
 # ---------------------------------------------------------------------------
 # WebSocket
 # ---------------------------------------------------------------------------
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
@@ -536,7 +588,10 @@ async def websocket_endpoint(ws: WebSocket):
 
             # Record if active (use fixed camera for data)
             if state.recording and state.collector:
-                state.collector.step(state.obs, action, reward, terminated)
+                fixed_image = state.render_fixed_camera_frame()
+                state.collector.step(
+                    state.obs, action, reward, terminated, image=fixed_image
+                )
 
             state.obs = next_obs
             state.step_count += 1
@@ -557,27 +612,41 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # If backend falls behind, reduce JPEG quality a bit to regain FPS.
                 # If backend recovers, gradually restore quality.
-                if current_fps < (state.target_fps - 3) and dynamic_jpeg_quality > min_jpeg_quality:
-                    dynamic_jpeg_quality = max(min_jpeg_quality, dynamic_jpeg_quality - 3)
-                elif current_fps > (state.target_fps - 1) and dynamic_jpeg_quality < max_jpeg_quality:
-                    dynamic_jpeg_quality = min(max_jpeg_quality, dynamic_jpeg_quality + 1)
+                if (
+                    current_fps < (state.target_fps - 3)
+                    and dynamic_jpeg_quality > min_jpeg_quality
+                ):
+                    dynamic_jpeg_quality = max(
+                        min_jpeg_quality, dynamic_jpeg_quality - 3
+                    )
+                elif (
+                    current_fps > (state.target_fps - 1)
+                    and dynamic_jpeg_quality < max_jpeg_quality
+                ):
+                    dynamic_jpeg_quality = min(
+                        max_jpeg_quality, dynamic_jpeg_quality + 1
+                    )
 
             # Send frame + state to client (drop stale frame if queue is full)
-            payload = json.dumps({
-                "type": "frame",
-                "image": frame_b64,
-                "step": state.step_count,
-                "reward": float(round(reward, 4)),
-                "total_reward": float(round(state.last_reward, 4)),
-                "episode": state.episode_count,
-                "recording": state.recording,
-                "success": state.last_success,
-                "fps": round(current_fps, 1),
-                "task": state.task_name,
-                "episodes_recorded": state.collector.num_episodes if state.collector else 0,
-                "gripper": "closed" if state.gripper_target > 0 else "open",
-                "control_mode": state.control_mode,
-            })
+            payload = json.dumps(
+                {
+                    "type": "frame",
+                    "image": frame_b64,
+                    "step": state.step_count,
+                    "reward": float(round(reward, 4)),
+                    "total_reward": float(round(state.last_reward, 4)),
+                    "episode": state.episode_count,
+                    "recording": state.recording,
+                    "success": state.last_success,
+                    "fps": round(current_fps, 1),
+                    "task": state.task_name,
+                    "episodes_recorded": state.collector.num_episodes
+                    if state.collector
+                    else 0,
+                    "gripper": "closed" if state.gripper_target > 0 else "open",
+                    "control_mode": state.control_mode,
+                }
+            )
             if send_queue.full():
                 try:
                     send_queue.get_nowait()
@@ -592,7 +661,9 @@ async def websocket_endpoint(ws: WebSocket):
             # TimeLimit wrapper is stripped, so truncated should not occur
             if terminated:
                 reason = "success" if state.last_success else "terminated"
-                logger.info(f"Episode {state.episode_count} ended: {reason} at step {state.step_count}")
+                logger.info(
+                    f"Episode {state.episode_count} ended: {reason} at step {state.step_count}"
+                )
                 if state.recording and state.collector:
                     state.collector.end_episode()
                 state.obs, _ = state.env.reset()
@@ -601,7 +672,9 @@ async def websocket_endpoint(ws: WebSocket):
             elif truncated:
                 # Safety fallback: if truncation somehow occurs, reset silently
                 state.obs, _ = state.env.reset()
-                logger.warning(f"Unexpected truncation at step {state.step_count}, auto-reset")
+                logger.warning(
+                    f"Unexpected truncation at step {state.step_count}, auto-reset"
+                )
                 state.step_count = 0
                 state.episode_count += 1
 
@@ -625,6 +698,7 @@ async def websocket_endpoint(ws: WebSocket):
 # WebSocket Replay Endpoint (ManiSkill only)
 # ---------------------------------------------------------------------------
 
+
 @app.websocket("/ws/replay")
 async def websocket_replay_endpoint(ws: WebSocket):
     """
@@ -638,7 +712,11 @@ async def websocket_replay_endpoint(ws: WebSocket):
     logger.info("Replay WebSocket client connected")
 
     if SIMULATOR != "maniskill":
-        await ws.send_text(json.dumps({"type": "error", "message": "Replay only available for ManiSkill"}))
+        await ws.send_text(
+            json.dumps(
+                {"type": "error", "message": "Replay only available for ManiSkill"}
+            )
+        )
         await ws.close()
         return
 
@@ -657,15 +735,21 @@ async def websocket_replay_endpoint(ws: WebSocket):
                 traj_path = msg.get("traj_path", "")
                 episode_id = int(msg.get("episode_id", 0))
                 replay_speed = float(msg.get("speed", 1.0))
-                control_mode = msg.get("control_mode")  # None = auto-detect from metadata
+                control_mode = msg.get(
+                    "control_mode"
+                )  # None = auto-detect from metadata
                 render_width = int(msg.get("width", 640))
                 render_height = int(msg.get("height", 480))
 
                 if not traj_path or not os.path.exists(traj_path):
-                    await ws.send_text(json.dumps({
-                        "type": "error",
-                        "message": f"Trajectory file not found: {traj_path}",
-                    }))
+                    await ws.send_text(
+                        json.dumps(
+                            {
+                                "type": "error",
+                                "message": f"Trajectory file not found: {traj_path}",
+                            }
+                        )
+                    )
                     continue
 
                 replay_active = True
@@ -674,7 +758,15 @@ async def websocket_replay_endpoint(ws: WebSocket):
                 try:
                     from maniskill_teleop.replay import visual_replay_generator
 
-                    await ws.send_text(json.dumps({"type": "replay_started", "traj_path": traj_path, "episode_id": episode_id}))
+                    await ws.send_text(
+                        json.dumps(
+                            {
+                                "type": "replay_started",
+                                "traj_path": traj_path,
+                                "episode_id": episode_id,
+                            }
+                        )
+                    )
 
                     generator = visual_replay_generator(
                         traj_path=traj_path,
@@ -689,7 +781,9 @@ async def websocket_replay_endpoint(ws: WebSocket):
                     for frame_data in generator:
                         # Check for control messages (non-blocking)
                         try:
-                            ctrl_raw = await asyncio.wait_for(ws.receive_text(), timeout=0.001)
+                            ctrl_raw = await asyncio.wait_for(
+                                ws.receive_text(), timeout=0.001
+                            )
                             ctrl_msg = json.loads(ctrl_raw)
                             ctrl_type = ctrl_msg.get("type", "")
                             if ctrl_type == "pause":
@@ -708,7 +802,9 @@ async def websocket_replay_endpoint(ws: WebSocket):
                         # Wait while paused
                         while paused and replay_active:
                             try:
-                                ctrl_raw = await asyncio.wait_for(ws.receive_text(), timeout=0.1)
+                                ctrl_raw = await asyncio.wait_for(
+                                    ws.receive_text(), timeout=0.1
+                                )
                                 ctrl_msg = json.loads(ctrl_raw)
                                 if ctrl_msg.get("type") == "resume":
                                     paused = False
@@ -727,14 +823,18 @@ async def websocket_replay_endpoint(ws: WebSocket):
                         img.save(buf, format="JPEG", quality=80)
                         frame_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
 
-                        await ws.send_text(json.dumps({
-                            "type": "replay_frame",
-                            "image": frame_b64,
-                            "step": frame_data["step"],
-                            "total_steps": frame_data["total_steps"],
-                            "reward": frame_data["reward"],
-                            "success": frame_data["success"],
-                        }))
+                        await ws.send_text(
+                            json.dumps(
+                                {
+                                    "type": "replay_frame",
+                                    "image": frame_b64,
+                                    "step": frame_data["step"],
+                                    "total_steps": frame_data["total_steps"],
+                                    "reward": frame_data["reward"],
+                                    "success": frame_data["success"],
+                                }
+                            )
+                        )
 
                         await asyncio.sleep(frame_interval)
 
@@ -777,7 +877,9 @@ def _switch_task(direction: int):
     new_task = tasks[new_idx]
     if new_task != state.task_name:
         state._pending_task = new_task
-        logger.info(f"Task switch requested via JoyCon: → {new_task} (index {new_idx}/{len(tasks)})")
+        logger.info(
+            f"Task switch requested via JoyCon: → {new_task} (index {new_idx}/{len(tasks)})"
+        )
 
 
 def handle_client_message(msg: dict):
@@ -822,7 +924,9 @@ def handle_client_message(msg: dict):
 
     elif msg_type == "camera_rotate":
         state.camera_azimuth += float(msg.get("dx", 0)) * 0.5
-        state.camera_elevation = max(-90, min(0, state.camera_elevation + float(msg.get("dy", 0)) * 0.5))
+        state.camera_elevation = max(
+            -90, min(0, state.camera_elevation + float(msg.get("dy", 0)) * 0.5)
+        )
 
     elif msg_type == "camera_zoom":
         delta = float(msg.get("delta", 0))
@@ -848,11 +952,14 @@ def handle_client_message(msg: dict):
         dx = float(msg.get("dx", 0)) * state.speed
         dy = float(msg.get("dy", 0)) * state.speed
         dz = float(msg.get("dz", 0)) * state.speed
-        
+
         # Deadzone filter
-        if abs(dx) < 0.08 * state.speed: dx = 0.0
-        if abs(dy) < 0.08 * state.speed: dy = 0.0
-        if abs(dz) < 0.08 * state.speed: dz = 0.0
+        if abs(dx) < 0.08 * state.speed:
+            dx = 0.0
+        if abs(dy) < 0.08 * state.speed:
+            dy = 0.0
+        if abs(dz) < 0.08 * state.speed:
+            dz = 0.0
 
         cam = float(msg.get("cam", 0))
         if abs(cam) > 0.1:
@@ -879,10 +986,14 @@ def handle_client_message(msg: dict):
             state.recording = True
         elif buttons.get("record_stop"):
             state.recording = False
-            
-        state._gamepad_action = np.array([dx, dy, dz, state.gripper_target], dtype=np.float32)
+
+        state._gamepad_action = np.array(
+            [dx, dy, dz, state.gripper_target], dtype=np.float32
+        )
         if state.debug and (abs(dx) > 0.001 or abs(dy) > 0.001 or abs(dz) > 0.001):
-            logger.info(f"teleop_cmd action: dx={dx:.4f} dy={dy:.4f} dz={dz:.4f} grip={state.gripper_target}")
+            logger.info(
+                f"teleop_cmd action: dx={dx:.4f} dy={dy:.4f} dz={dz:.4f} grip={state.gripper_target}"
+            )
 
     elif msg_type == "joycon_input":
         # Legacy fallback
@@ -891,7 +1002,7 @@ def handle_client_message(msg: dict):
     elif msg_type == "joycon_connected":
         # Browser notifies which JoyCon was paired via WebHID
         pid = msg.get("product_id", JOYCON_R_PRODUCT_ID)
-        joycon_state.is_right = (pid == JOYCON_R_PRODUCT_ID)
+        joycon_state.is_right = pid == JOYCON_R_PRODUCT_ID
         pname = msg.get("product_name", "unknown")
         side = "Right" if joycon_state.is_right else "Left"
         logger.info(f"JoyCon connected via WebHID: {pname} (pid=0x{pid:04X}, {side})")
@@ -922,7 +1033,9 @@ def handle_client_message(msg: dict):
             dz = 0.0
 
         state.gripper_target = result["gripper"]
-        state._gamepad_action = np.array([dx, dy, dz, state.gripper_target], dtype=np.float32)
+        state._gamepad_action = np.array(
+            [dx, dy, dz, state.gripper_target], dtype=np.float32
+        )
 
         # Orientation delta from IMU → accumulate for next apply_orientation() call
         ori = result["orientation_delta"]
@@ -952,7 +1065,9 @@ def handle_client_message(msg: dict):
             _switch_task(result["scene_control"])
 
         if state.debug and (abs(dx) > 0.001 or abs(dy) > 0.001 or abs(dz) > 0.001):
-            logger.info(f"joycon_raw → dx={dx:.4f} dy={dy:.4f} dz={dz:.4f} grip={state.gripper_target}")
+            logger.info(
+                f"joycon_raw → dx={dx:.4f} dy={dy:.4f} dz={dz:.4f} grip={state.gripper_target}"
+            )
 
     elif msg_type == "set_control_mode":
         mode = msg.get("mode", "camera")
@@ -973,32 +1088,69 @@ def handle_client_message(msg: dict):
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+
 def main():
     global state, SIMULATOR
 
-    parser = argparse.ArgumentParser(description="Web Teleoperation Server (Metaworld / ManiSkill)")
-    parser.add_argument("--simulator", type=str, default="metaworld",
-                        choices=["metaworld", "maniskill"],
-                        help="Simulation backend (default: metaworld)")
-    parser.add_argument("--port", type=int, default=9527, help="Server port (default: 9527)")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
-    parser.add_argument("--task", type=str, default=None,
-                        help="Initial task (default: pick-place-v3 for metaworld, PickCube-v1 for maniskill)")
-    parser.add_argument("--speed", type=float, default=0.1, help="Movement speed (default: 0.1)")
-    parser.add_argument("--save-dir", type=str, default="data/datasets/teleop", help="Save directory")
+    parser = argparse.ArgumentParser(
+        description="Web Teleoperation Server (Metaworld / ManiSkill)"
+    )
+    parser.add_argument(
+        "--simulator",
+        type=str,
+        default="metaworld",
+        choices=["metaworld", "maniskill"],
+        help="Simulation backend (default: metaworld)",
+    )
+    parser.add_argument(
+        "--port", type=int, default=9527, help="Server port (default: 9527)"
+    )
+    parser.add_argument(
+        "--host", type=str, default="0.0.0.0", help="Bind host (default: 0.0.0.0)"
+    )
+    parser.add_argument(
+        "--task",
+        type=str,
+        default=None,
+        help="Initial task (default: pick-place-v3 for metaworld, PickCube-v1 for maniskill)",
+    )
+    parser.add_argument(
+        "--speed", type=float, default=0.1, help="Movement speed (default: 0.1)"
+    )
+    parser.add_argument(
+        "--save-dir", type=str, default="data/datasets/teleop", help="Save directory"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--fps", type=int, default=30, help="Target FPS (default: 30)")
-    parser.add_argument("--width", type=int, default=640, help="Render width (default: 640)")
-    parser.add_argument("--height", type=int, default=480, help="Render height (default: 480)")
-    parser.add_argument("--jpeg-quality", type=int, default=80, help="JPEG quality 1-100 (default: 80)")
-    parser.add_argument("--debug", action="store_true", help="Enable debug logging (gamepad, orientation)")
+    parser.add_argument(
+        "--width", type=int, default=640, help="Render width (default: 640)"
+    )
+    parser.add_argument(
+        "--height", type=int, default=480, help="Render height (default: 480)"
+    )
+    parser.add_argument(
+        "--jpeg-quality", type=int, default=80, help="JPEG quality 1-100 (default: 80)"
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging (gamepad, orientation)",
+    )
     # ManiSkill-specific options
-    parser.add_argument("--control-mode", type=str, default="pd_ee_delta_pos",
-                        choices=["pd_ee_delta_pos", "pd_ee_delta_pose"],
-                        help="ManiSkill control mode: 4-DOF (pos) or 7-DOF (pose)")
-    parser.add_argument("--obs-mode", type=str, default="state",
-                        choices=["state", "rgbd", "pointcloud"],
-                        help="ManiSkill observation mode")
+    parser.add_argument(
+        "--control-mode",
+        type=str,
+        default="pd_ee_delta_pos",
+        choices=["pd_ee_delta_pos", "pd_ee_delta_pose"],
+        help="ManiSkill control mode: 4-DOF (pos) or 7-DOF (pose)",
+    )
+    parser.add_argument(
+        "--obs-mode",
+        type=str,
+        default="state",
+        choices=["state", "rgbd", "pointcloud"],
+        help="ManiSkill observation mode",
+    )
 
     args = parser.parse_args()
 
@@ -1030,10 +1182,14 @@ def main():
 
     logger.info(f"Simulator: {SIMULATOR}")
     logger.info(f"Starting web teleoperation server on {args.host}:{args.port}")
-    logger.info(f"Task: {state.task_name} | Speed: {args.speed} | FPS: {args.fps} | Debug: {args.debug}")
+    logger.info(
+        f"Task: {state.task_name} | Speed: {args.speed} | FPS: {args.fps} | Debug: {args.debug}"
+    )
     if SIMULATOR == "maniskill":
         logger.info(f"Control mode: {args.control_mode} | Obs mode: {args.obs_mode}")
-    logger.info(f"Open http://<server_ip>:{args.port} in your browser to start teleoperation")
+    logger.info(
+        f"Open http://<server_ip>:{args.port} in your browser to start teleoperation"
+    )
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 

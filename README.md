@@ -530,7 +530,10 @@ bash run_gen_demo.sh
 
 只要你的任务需要采集少量示教来克服空间泛化问题，𝑫𝒆𝒎𝒐𝑮𝒆𝒏 就能帮助你节省重复的人力劳动。正如我们在论文中的实验所证明的，𝑫𝒆𝒎𝒐𝑮𝒆𝒏 对各种类型的任务普遍有效，甚至包括接触密集型运动技能。为了帮助你将 𝑫𝒆𝒎𝒐𝑮𝒆𝒏 应用到自己的任务，我们在 `docs` 文件夹下准备了详细指南，有兴趣请查阅！
 
-
+# 可视化
+```shell
+micromamba run -n metaworld_teleop python metaworld_teleop/visualize_zarr.py data/datasets/teleop/teleop_assembly-v3_20260303_000546.zarr
+```
 ---
 
 # 许可证
